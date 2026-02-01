@@ -34,3 +34,6 @@
 ## Notes
 - Priority remains TTS; this is future work only.
 - Keep changes on a branch until explicitly approved to merge.
+
+
+2 sliders, 1 is progress, 1 is speed, play button, can be automatic or manual movement

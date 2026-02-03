@@ -10,7 +10,8 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
-const String _defaultApiBase = 'https://api.voxtour.ai';
+const String _apiBase = 'https://api.voxtour.ai';
+const String _apiKey = '96f5b69a-6f16-4b36-ae05-b85a7dd728a6';
 const double _feetToMeters = 0.3048;
 
 void main() {
@@ -41,8 +42,6 @@ class SpooferScreen extends StatefulWidget {
 }
 
 class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateMixin {
-  final TextEditingController _apiBaseController = TextEditingController(text: _defaultApiBase);
-  final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _tourIdController = TextEditingController();
 
   final MethodChannel _mockChannel = const MethodChannel('voxtourai_gps_spoofer/mock_location');
@@ -68,8 +67,6 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   @override
   void dispose() {
     _ticker?.dispose();
-    _apiBaseController.dispose();
-    _apiKeyController.dispose();
     _tourIdController.dispose();
     super.dispose();
   }
@@ -145,24 +142,6 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
               ],
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: _apiKeyController,
-              decoration: const InputDecoration(
-                labelText: 'API Key',
-                hintText: 'Partner API key',
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _apiBaseController,
-              decoration: const InputDecoration(
-                labelText: 'API Base',
-                hintText: 'https://api-stage.voxtour.ai',
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 IconButton(
@@ -228,11 +207,15 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
   Future<void> _loadRoute() async {
     final tourId = _tourIdController.text.trim();
-    final apiKey = _apiKeyController.text.trim();
-    final apiBase = _normalizeApiBase(_apiBaseController.text.trim());
+    final apiKey = _apiKey;
+    final apiBase = _apiBase;
 
-    if (tourId.isEmpty || apiKey.isEmpty || apiBase.isEmpty) {
-      _showSnack('Enter tour ID, API key, and API base.');
+    if (tourId.isEmpty) {
+      _showSnack('Enter a tour ID.');
+      return;
+    }
+    if (_apiKey.isEmpty) {
+      _showSnack('API key is not configured.');
       return;
     }
 
@@ -504,13 +487,6 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       southwest: LatLng(minLat, minLng),
       northeast: LatLng(maxLat, maxLng),
     );
-  }
-
-  String _normalizeApiBase(String base) {
-    if (base.endsWith('/')) {
-      return base.substring(0, base.length - 1);
-    }
-    return base;
   }
 
   String _formatDistance(double meters) {

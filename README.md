@@ -16,6 +16,12 @@
 - Publish as a separate app under the existing WalksTo brand (exact name TBD).
 - Free initially; consider ads/monetization after studying competitors.
 
+## Configuration
+- Google Maps key: add `MAPS_API_KEY=...` to `android/local.properties` (not committed).
+- VoxTour API: pass at run time:
+  - `--dart-define=VOXTOUR_API_KEY=...`
+  - optional: `--dart-define=VOXTOUR_API_BASE=https://api.voxtour.ai`
+
 ## Constraints / process
 - Keep scope minimal and avoid extra complexity.
 - If using shared libraries, coordinate and do not commit directly without review.

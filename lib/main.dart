@@ -9,9 +9,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
-const String _apiBase = 'https://api.voxtour.ai';
-const String _apiKey = '96f5b69a-6f16-4b36-ae05-b85a7dd728a6';
+const String _apiBase =
+    String.fromEnvironment('VOXTOUR_API_BASE', defaultValue: 'https://api.voxtour.ai');
+const String _apiKey = String.fromEnvironment('VOXTOUR_API_KEY', defaultValue: '');
 const double _feetToMeters = 0.3048;
 const String _widgetSitemapUrl = 'https://bff.voxtour.ai/ssr/widget/sitemap/index';
 
@@ -67,11 +69,26 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   bool _isPlaying = false;
   Ticker? _ticker;
   Duration? _lastTick;
+  String? _mockError;
+  DateTime? _lastMockErrorAt;
+  bool? _hasLocationPermission;
+  bool? _isDeveloperModeEnabled;
+  bool? _isMockLocationApp;
+  bool _startupChecksRunning = false;
+  Map<String, Object?>? _lastMockStatus;
+  String? _selectedMockApp;
+  LatLng? _lastInjectedPosition;
+  bool _showMockMarker = false;
+  bool _showSetupBar = false;
+  bool _showDebugPanel = false;
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadTours());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_runStartupChecks(showDialogs: true));
+    });
   }
 
   @override
@@ -85,12 +102,20 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     return Scaffold(
       appBar: AppBar(
         title: Text(_tourName?.trim().isNotEmpty == true ? _tourName! : 'VoxTour GPS Spoofer'),
+        actions: [
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings),
+            onPressed: _openSettingsSheet,
+          ),
+        ],
       ),
       body: Column(
         children: [
           Expanded(
-            flex: 2,
+            flex: 1,
             child: GoogleMap(
+              key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
               initialCameraPosition: CameraPosition(
                 target: _currentPosition ?? const LatLng(0, 0),
                 zoom: _currentPosition == null ? 2 : 16,
@@ -98,14 +123,17 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
               onMapCreated: _onMapCreated,
               markers: _markers,
               polylines: _polylines,
-              myLocationEnabled: false,
-              myLocationButtonEnabled: false,
+              myLocationEnabled: _hasLocationPermission == true,
+              myLocationButtonEnabled: _hasLocationPermission == true,
               zoomControlsEnabled: false,
             ),
           ),
           Expanded(
             flex: 1,
-            child: _buildControls(context),
+            child: SafeArea(
+              top: false,
+              child: _buildControls(context),
+            ),
           ),
         ],
       ),
@@ -172,6 +200,18 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
               ],
             ),
             const SizedBox(height: 8),
+            if (_showSetupBar)
+              OutlinedButton.icon(
+                onPressed: () => _runStartupChecks(showDialogs: true),
+                icon: const Icon(Icons.check_circle_outline),
+                label: Text(
+                  'Setup: '
+                  'location ${_statusLabel(_hasLocationPermission)} · '
+                  'dev ${_statusLabel(_isDeveloperModeEnabled)} · '
+                  'mock ${_statusLabel(_isMockLocationApp)}',
+                ),
+              ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 IconButton(
@@ -205,8 +245,8 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                   child: Slider(
                     value: _speedFtPerSec,
                     min: 1,
-                    max: 20,
-                    divisions: 19,
+                    max: 200,
+                    divisions: 199,
                     onChanged: (value) {
                       setState(() {
                         _speedFtPerSec = value;
@@ -222,8 +262,98 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
               'Enable Developer Options and set this app as the mock location provider.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (_mockError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  _mockError!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.redAccent),
+                ),
+              ),
+            const SizedBox(height: 8),
+            if (_showDebugPanel) _buildDebugPanel(context),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDebugPanel(BuildContext context) {
+    final status = _lastMockStatus;
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Debug', style: theme.textTheme.labelLarge),
+          const SizedBox(height: 4),
+          Text(
+            'Injected: ${_lastInjectedPosition == null ? '—' : '${_lastInjectedPosition!.latitude.toStringAsFixed(6)}, ${_lastInjectedPosition!.longitude.toStringAsFixed(6)}'}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'Mock app selected: ${_isMockLocationApp == null ? '—' : _isMockLocationApp == true ? 'YES' : 'NO'}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'Selected package: ${_selectedMockApp ?? '—'}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'GPS applied: ${status?['gpsApplied'] ?? '—'}',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'Fused applied: ${status?['fusedApplied'] ?? '—'}',
+            style: theme.textTheme.bodySmall,
+          ),
+          if (status?['gpsError'] != null)
+            Text(
+              'GPS error: ${status?['gpsError']}',
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          if (status?['addProviderError'] != null || status?['addProviderResult'] != null)
+            Text(
+              'addTestProvider: ${status?['addProviderResult'] ?? '—'} ${status?['addProviderError'] ?? ''}'.trim(),
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          if (status?['enableProviderError'] != null || status?['enableProviderResult'] != null)
+            Text(
+              'setTestProviderEnabled: ${status?['enableProviderResult'] ?? '—'} ${status?['enableProviderError'] ?? ''}'.trim(),
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          if (status?['statusProviderError'] != null || status?['statusProviderResult'] != null)
+            Text(
+              'setTestProviderStatus: ${status?['statusProviderResult'] ?? '—'} ${status?['statusProviderError'] ?? ''}'
+                  .trim(),
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          if (status?['removeProviderError'] != null || status?['removeProviderResult'] != null)
+            Text(
+              'removeTestProvider: ${status?['removeProviderResult'] ?? '—'} ${status?['removeProviderError'] ?? ''}'
+                  .trim(),
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          if (status?['fusedError'] != null)
+            Text(
+              'Fused error: ${status?['fusedError']}',
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _refreshMockAppStatus,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh mock status'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -380,12 +510,18 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     setState(() {
       _progress = clamped;
       _currentPosition = position;
-      _markers = {
-        Marker(
-          markerId: const MarkerId('current'),
-          position: position,
-        ),
-      };
+      _lastInjectedPosition = position;
+      _markers = _showMockMarker
+          ? {
+              Marker(
+                markerId: const MarkerId('current'),
+                position: position,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                infoWindow: const InfoWindow(title: 'Mocked GPS'),
+                zIndex: 1,
+              ),
+            }
+          : const {};
     });
 
     unawaited(_sendMockLocation(position));
@@ -420,12 +556,48 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
   Future<void> _sendMockLocation(LatLng position) async {
     final speedMps = _speedFtPerSec * _feetToMeters;
-    await _mockChannel.invokeMethod('setMockLocation', {
-      'latitude': position.latitude,
-      'longitude': position.longitude,
-      'accuracy': 3.0,
-      'speedMps': speedMps,
-    });
+    try {
+      final result = await _mockChannel.invokeMethod<Map<Object?, Object?>>('setMockLocation', {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'accuracy': 3.0,
+        'speedMps': speedMps,
+      });
+      if (mounted) {
+        setState(() {
+          _lastMockStatus = result?.map((key, value) => MapEntry(key.toString(), value));
+        });
+      }
+      final gpsApplied = result?['gpsApplied'] == true;
+      final mockAppSelected = result?['mockAppSelected'] == true;
+      final gpsError = result?['gpsError']?.toString();
+      final fusedError = result?['fusedError']?.toString();
+
+      if (!gpsApplied) {
+        final details = gpsError ?? fusedError ?? 'GPS mock not applied';
+        final hint = mockAppSelected ? 'Mock app set, but GPS mock failed.' : 'Select this app as mock location.';
+        final message = 'Mock GPS not applied: $details. $hint';
+        if (mounted) {
+          setState(() {
+            _mockError = message;
+          });
+        }
+      } else if (_mockError != null && mounted) {
+        setState(() {
+          _mockError = null;
+        });
+      }
+    } on PlatformException catch (error) {
+      final now = DateTime.now();
+      if (_lastMockErrorAt == null || now.difference(_lastMockErrorAt!) > const Duration(seconds: 5)) {
+        _lastMockErrorAt = now;
+        if (mounted) {
+          setState(() {
+            _mockError = 'Mock location failed: ${error.message ?? error.code}';
+          });
+        }
+      }
+    }
   }
 
   List<LatLng> _decodePolyline(String encoded) {
@@ -552,7 +724,9 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       _isLoadingTours = true;
     });
     try {
-      final response = await http.get(Uri.parse(_widgetSitemapUrl));
+      final response = await http
+          .get(Uri.parse(_widgetSitemapUrl))
+          .timeout(const Duration(seconds: 12));
       if (response.statusCode != 200) {
         _showSnack('Failed to fetch tours (${response.statusCode}).');
         return;
@@ -566,6 +740,8 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
         _tourOptions = options;
         _selectedTour ??= options.first;
       });
+    } on TimeoutException {
+      _showSnack('Timed out fetching tours. Check network and try again.');
     } catch (error) {
       _showSnack('Failed to fetch tours: $error');
     } finally {
@@ -602,6 +778,226 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
     options.sort((a, b) => a.label.compareTo(b.label));
     return options;
+  }
+
+  String _statusLabel(bool? value) {
+    if (value == null) {
+      return '…';
+    }
+    return value ? 'OK' : 'NO';
+  }
+
+  Future<void> _runStartupChecks({required bool showDialogs}) async {
+    if (_startupChecksRunning) {
+      return;
+    }
+    _startupChecksRunning = true;
+    try {
+      final locationGranted = await _requestLocationPermission(showDialogs: showDialogs);
+      if (!locationGranted) {
+        return;
+      }
+
+      final devEnabled = await _isDeveloperModeEnabledNative();
+      setState(() {
+        _isDeveloperModeEnabled = devEnabled;
+      });
+      if (!devEnabled) {
+        if (showDialogs) {
+          final open = await _confirmDialog(
+            'Enable Developer Options',
+            'Developer options must be enabled to select a mock location app.',
+            'Open Developer Options',
+          );
+          if (open) {
+            await _openDeveloperSettings();
+          }
+        }
+        return;
+      }
+
+      final isMockApp = await _isMockLocationAppNative();
+      setState(() {
+        _isMockLocationApp = isMockApp;
+      });
+      if (!isMockApp && showDialogs) {
+        final open = await _confirmDialog(
+          'Select Mock Location App',
+          'Choose this app as the mock location provider.',
+          'Open Developer Options',
+        );
+        if (open) {
+          await _openDeveloperSettings();
+        }
+      }
+    } finally {
+      _startupChecksRunning = false;
+    }
+  }
+
+  Future<bool> _requestLocationPermission({required bool showDialogs}) async {
+    final status = await Permission.locationWhenInUse.request();
+    final granted = status.isGranted;
+    setState(() {
+      _hasLocationPermission = granted;
+    });
+    if (granted) {
+      return true;
+    }
+
+    if (!showDialogs) {
+      return false;
+    }
+
+    final open = await _confirmDialog(
+      'Location Permission Required',
+      'Grant location permission so the mock GPS updates can be applied.',
+      'Open App Settings',
+    );
+    if (open) {
+      await openAppSettings();
+    }
+    return false;
+  }
+
+  Future<bool> _isDeveloperModeEnabledNative() async {
+    try {
+      final enabled = await _mockChannel.invokeMethod<bool>('isDeveloperModeEnabled');
+      return enabled ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _isMockLocationAppNative() async {
+    try {
+      final enabled = await _mockChannel.invokeMethod<bool>('isMockLocationApp');
+      return enabled ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _refreshMockAppStatus() async {
+    try {
+      final selected = await _mockChannel.invokeMethod<String>('getMockLocationApp');
+      final isSelected = await _isMockLocationAppNative();
+      if (mounted) {
+        setState(() {
+          _selectedMockApp = selected;
+          _isMockLocationApp = isSelected;
+        });
+      }
+    } catch (_) {
+      // Ignore refresh failures.
+    }
+  }
+
+  Future<void> _openSettingsSheet() async {
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text('Settings', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                title: const Text('Show setup bar'),
+                value: _showSetupBar,
+                onChanged: (value) {
+                  setState(() {
+                    _showSetupBar = value;
+                  });
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Show debug panel'),
+                value: _showDebugPanel,
+                onChanged: (value) {
+                  setState(() {
+                    _showDebugPanel = value;
+                  });
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Show mocked marker'),
+                value: _showMockMarker,
+                onChanged: (value) {
+                  setState(() {
+                    _showMockMarker = value;
+                    if (!_showMockMarker) {
+                      _markers = const {};
+                    } else if (_currentPosition != null) {
+                      _markers = {
+                        Marker(
+                          markerId: const MarkerId('current'),
+                          position: _currentPosition!,
+                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                          infoWindow: const InfoWindow(title: 'Mocked GPS'),
+                          zIndex: 1,
+                        ),
+                      };
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _runStartupChecks(showDialogs: true);
+                },
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Run setup checks'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  _refreshMockAppStatus();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh mock status'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openDeveloperSettings() async {
+    try {
+      await _mockChannel.invokeMethod('openDeveloperSettings');
+    } on PlatformException catch (error) {
+      _showSnack('Failed to open developer settings: ${error.message ?? error.code}');
+    }
+  }
+
+  Future<bool> _confirmDialog(String title, String message, String actionLabel) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(actionLabel),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }
 

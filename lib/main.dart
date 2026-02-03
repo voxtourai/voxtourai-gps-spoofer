@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 const String _apiBase = 'https://api.voxtour.ai';
 const String _apiKey = '96f5b69a-6f16-4b36-ae05-b85a7dd728a6';
 const double _feetToMeters = 0.3048;
+const String _widgetSitemapUrl = 'https://widget.voxtour.ai/ssr/widget/sitemap/index';
 
 void main() {
   runApp(const SpooferApp());
@@ -42,7 +43,10 @@ class SpooferScreen extends StatefulWidget {
 }
 
 class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateMixin {
-  final TextEditingController _tourIdController = TextEditingController();
+  List<TourOption> _tourOptions = [];
+  TourOption? _selectedTour;
+  String? _tourName;
+  bool _isLoadingTours = false;
 
   final MethodChannel _mockChannel = const MethodChannel('voxtourai_gps_spoofer/mock_location');
 
@@ -65,9 +69,14 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   Duration? _lastTick;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(_loadTours());
+  }
+
+  @override
   void dispose() {
     _ticker?.dispose();
-    _tourIdController.dispose();
     super.dispose();
   }
 
@@ -75,7 +84,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VoxTour GPS Spoofer'),
+        title: Text(_tourName?.trim().isNotEmpty == true ? _tourName! : 'VoxTour GPS Spoofer'),
       ),
       body: Column(
         children: [
@@ -119,16 +128,37 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _tourIdController,
-                    decoration: const InputDecoration(
-                      labelText: 'Tour ID',
-                      hintText: 'Journey/tour UUID',
+                  child: DropdownButtonFormField<TourOption>(
+                    isExpanded: true,
+                    value: _selectedTour,
+                    items: _tourOptions
+                        .map(
+                          (option) => DropdownMenuItem<TourOption>(
+                            value: option,
+                            child: Text(option.label, overflow: TextOverflow.ellipsis),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _tourOptions.isEmpty
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _selectedTour = value;
+                            });
+                          },
+                    decoration: InputDecoration(
+                      labelText: _isLoadingTours ? 'Loading tours...' : 'Select tour',
                       isDense: true,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Refresh tours',
+                  onPressed: _isLoadingTours ? null : _loadTours,
+                  icon: const Icon(Icons.refresh),
+                ),
+                const SizedBox(width: 4),
                 FilledButton(
                   onPressed: _isLoading ? null : _loadRoute,
                   child: _isLoading
@@ -206,12 +236,12 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   }
 
   Future<void> _loadRoute() async {
-    final tourId = _tourIdController.text.trim();
+    final tourId = _selectedTour?.tourId;
     final apiKey = _apiKey;
     final apiBase = _apiBase;
 
-    if (tourId.isEmpty) {
-      _showSnack('Enter a tour ID.');
+    if (tourId == null || tourId.isEmpty) {
+      _showSnack('Select a tour first.');
       return;
     }
     if (_apiKey.isEmpty) {
@@ -238,6 +268,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final polyline = data['routePolyline'] as String? ?? '';
+      final tourName = data['tourName'] as String? ?? '';
       if (polyline.isEmpty) {
         _showSnack('No routePolyline found for this tour.');
         return;
@@ -250,6 +281,9 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       }
 
       _setRoute(points);
+      setState(() {
+        _tourName = tourName.isEmpty ? null : tourName;
+      });
       _fitRouteToMap();
     } catch (error) {
       _showSnack('Failed to load route: $error');
@@ -512,4 +546,70 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
+
+  Future<void> _loadTours() async {
+    setState(() {
+      _isLoadingTours = true;
+    });
+    try {
+      final response = await http.get(Uri.parse(_widgetSitemapUrl));
+      if (response.statusCode != 200) {
+        _showSnack('Failed to fetch tours (${response.statusCode}).');
+        return;
+      }
+      final options = _parseToursFromSitemap(response.body);
+      if (options.isEmpty) {
+        _showSnack('No tours found in sitemap.');
+        return;
+      }
+      setState(() {
+        _tourOptions = options;
+        _selectedTour ??= options.first;
+      });
+    } catch (error) {
+      _showSnack('Failed to fetch tours: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingTours = false;
+        });
+      }
+    }
+  }
+
+  List<TourOption> _parseToursFromSitemap(String xml) {
+    final locMatches = RegExp(r'<loc>([^<]+)</loc>').allMatches(xml);
+    final seen = <String>{};
+    final options = <TourOption>[];
+
+    for (final match in locMatches) {
+      final url = match.group(1);
+      if (url == null || !url.contains('tourId=')) {
+        continue;
+      }
+      final idMatch = RegExp(r'tourId=([0-9a-fA-F-]{36})').firstMatch(url);
+      if (idMatch == null) {
+        continue;
+      }
+      final tourId = idMatch.group(1)!;
+      final langMatch = RegExp(r'lang=([a-zA-Z-]+)').firstMatch(url);
+      final lang = langMatch?.group(1);
+      final key = '$tourId|${lang ?? ''}';
+      if (seen.add(key)) {
+        options.add(TourOption(tourId: tourId, language: lang));
+      }
+    }
+
+    options.sort((a, b) => a.label.compareTo(b.label));
+    return options;
+  }
+}
+
+class TourOption {
+  const TourOption({required this.tourId, this.language});
+
+  final String tourId;
+  final String? language;
+
+  String get label => language == null ? tourId : '$tourId ($language)';
 }

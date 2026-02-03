@@ -95,6 +95,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 48,
         title: const Text('GPS Spoofer'),
         actions: [
           IconButton(
@@ -107,7 +108,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       body: Column(
         children: [
           Expanded(
-            flex: 1,
+            flex: 3,
             child: Stack(
               children: [
                 GoogleMap(
@@ -127,7 +128,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                   markers: _markers,
                   polylines: _polylines,
                   myLocationEnabled: _hasLocationPermission == true,
-                  myLocationButtonEnabled: _hasLocationPermission == true,
+                  myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
                 ),
                 Positioned(
@@ -151,7 +152,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
             ),
           ),
           Expanded(
-            flex: 1,
+            flex: 4,
             child: SafeArea(
               top: false,
               child: _buildControls(context),
@@ -163,56 +164,101 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   }
 
   Widget _buildControls(BuildContext context) {
+    final theme = Theme.of(context);
     final bool hasRoute = _routePoints.length >= 2;
     final progressLabel = '${(_progress * 100).toStringAsFixed(0)}%';
     final distanceLabel = _totalDistanceMeters > 0
         ? '${_formatDistance(_progress * _totalDistanceMeters)} / ${_formatDistance(_totalDistanceMeters)}'
         : '0 m';
+    final sliderTheme = SliderTheme.of(context).copyWith(
+      trackHeight: 3,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+    );
+    final speedSliderTheme = sliderTheme.copyWith(
+      activeTrackColor: theme.colorScheme.outlineVariant,
+      inactiveTrackColor: theme.colorScheme.outlineVariant,
+      trackShape: const _UniformTrackShape(),
+    );
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(
+              'Route input',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+            const SizedBox(height: 4),
             TextFormField(
               controller: _routeController,
               minLines: 2,
               maxLines: 4,
               onChanged: (_) => setState(() {}),
+              style: Theme.of(context).textTheme.bodySmall,
               decoration: const InputDecoration(
-                labelText: 'Route input',
                 hintText: 'Paste encoded polyline or Routes API JSON',
                 border: OutlineInputBorder(),
+                isDense: false,
+                contentPadding: EdgeInsets.fromLTRB(12, 12, 12, 12),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
-                  child: FilledButton(
-                    onPressed: _routeController.text.trim().isEmpty ? null : _loadRouteFromInput,
-                    child: const Text('Load route'),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: hasRoute ? _togglePlayback : null,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            textStyle: Theme.of(context).textTheme.labelSmall,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: 18),
+                          label: Text(_isPlaying ? 'Pause' : 'Play'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _routeController.text.trim().isEmpty ? null : _loadRouteFromInput,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 32),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            textStyle: Theme.of(context).textTheme.labelSmall,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: const Text('Load route'),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
+                IconButton(
                   onPressed: _routeController.text.isEmpty
                       ? null
                       : () {
                           _routeController.clear();
                           setState(() {});
                         },
-                  child: const Text('Clear'),
+                  tooltip: 'Clear',
+                  icon: const Icon(Icons.close),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
-              'Accepts encoded polyline or Google Routes API JSON (routes[0].polyline.encodedPolyline).',
-              style: Theme.of(context).textTheme.bodySmall,
+              'Accepts encoded polyline or Google Routes API JSON.',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             if (_showSetupBar)
               OutlinedButton.icon(
                 onPressed: () => _runStartupChecks(showDialogs: true),
@@ -224,14 +270,22 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                   'mock ${_statusLabel(_isMockLocationApp)}',
                 ),
               ),
-            const SizedBox(height: 8),
-            Row(
+            const SizedBox(height: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                IconButton(
-                  onPressed: hasRoute ? _togglePlayback : null,
-                  icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Progress', style: Theme.of(context).textTheme.labelMedium),
+                    Text(
+                      '$progressLabel · $distanceLabel',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ],
                 ),
-                Expanded(
+                SliderTheme(
+                  data: sliderTheme,
                   child: Slider(
                     value: _clamp01(_progress),
                     min: 0,
@@ -244,22 +298,23 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                         : null,
                   ),
                 ),
-                Text(progressLabel),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
-              child: Text(distanceLabel, textAlign: TextAlign.right),
-            ),
-            Row(
-              children: [
-                const Icon(Icons.speed),
-                Expanded(
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Speed', style: Theme.of(context).textTheme.labelMedium),
+                    Text(
+                      '${_speedFtPerSec.toStringAsFixed(1)} ft/s',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ],
+                ),
+                SliderTheme(
+                  data: speedSliderTheme,
                   child: Slider(
                     value: _speedFtPerSec,
-                    min: 1,
+                    min: -200,
                     max: 200,
-                    divisions: 199,
                     onChanged: (value) {
                       setState(() {
                         _speedFtPerSec = value;
@@ -267,14 +322,9 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                     },
                   ),
                 ),
-                Text('${_speedFtPerSec.toStringAsFixed(1)} ft/s'),
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              'Enable Developer Options and set this app as the mock location provider.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
             if (_mockError != null)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
@@ -543,6 +593,11 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
     if (nextDistance >= _totalDistanceMeters) {
       _setProgress(1);
+      _stopPlayback();
+      return;
+    }
+    if (nextDistance <= 0) {
+      _setProgress(0);
       _stopPlayback();
       return;
     }
@@ -1005,5 +1060,45 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       ),
     );
     return result ?? false;
+  }
+}
+
+class _UniformTrackShape extends SliderTrackShape with BaseSliderTrackShape {
+  const _UniformTrackShape();
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+    required TextDirection textDirection,
+    double additionalActiveTrackHeight = 2,
+  }) {
+    final trackHeight = sliderTheme.trackHeight ?? 2;
+    final trackRect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
+    );
+    final paint = Paint()
+      ..color = sliderTheme.inactiveTrackColor ?? sliderTheme.activeTrackColor ?? Colors.grey
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = trackHeight;
+
+    final y = trackRect.center.dy;
+    context.canvas.drawLine(
+      Offset(trackRect.left, y),
+      Offset(trackRect.right, y),
+      paint,
+    );
   }
 }

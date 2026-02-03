@@ -8,14 +8,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
-const String _apiBase =
-    String.fromEnvironment('VOXTOUR_API_BASE', defaultValue: 'https://api.voxtour.ai');
-const String _apiKey = String.fromEnvironment('VOXTOUR_API_KEY', defaultValue: '');
 const double _feetToMeters = 0.3048;
-const String _widgetSitemapUrl = 'https://bff.voxtour.ai/ssr/widget/sitemap/index';
+const String _samplePolyline =
+    'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 
 void main() {
   runApp(const SpooferApp());
@@ -27,7 +24,7 @@ class SpooferApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VoxTour GPS Spoofer',
+      title: 'GPS Spoofer',
       theme: ThemeData(
         colorSchemeSeed: Colors.blueGrey,
         useMaterial3: true,
@@ -45,15 +42,13 @@ class SpooferScreen extends StatefulWidget {
 }
 
 class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateMixin {
-  List<TourOption> _tourOptions = [];
-  TourOption? _selectedTour;
-  String? _tourName;
-  bool _isLoadingTours = false;
+  final TextEditingController _routeController = TextEditingController(text: _samplePolyline);
 
   final MethodChannel _mockChannel = const MethodChannel('voxtourai_gps_spoofer/mock_location');
 
   GoogleMapController? _mapController;
   bool _pendingFitRoute = false;
+  bool _autoFollow = true;
 
   List<LatLng> _routePoints = [];
   List<double> _cumulativeMeters = [];
@@ -65,7 +60,6 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   Set<Polyline> _polylines = const {};
   Set<Marker> _markers = const {};
 
-  bool _isLoading = false;
   bool _isPlaying = false;
   Ticker? _ticker;
   Duration? _lastTick;
@@ -85,7 +79,6 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    unawaited(_loadTours());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_runStartupChecks(showDialogs: true));
     });
@@ -94,6 +87,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   @override
   void dispose() {
     _ticker?.dispose();
+    _routeController.dispose();
     super.dispose();
   }
 
@@ -101,7 +95,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tourName?.trim().isNotEmpty == true ? _tourName! : 'VoxTour GPS Spoofer'),
+        title: const Text('GPS Spoofer'),
         actions: [
           IconButton(
             tooltip: 'Settings',
@@ -114,18 +108,46 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
         children: [
           Expanded(
             flex: 1,
-            child: GoogleMap(
-              key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
-              initialCameraPosition: CameraPosition(
-                target: _currentPosition ?? const LatLng(0, 0),
-                zoom: _currentPosition == null ? 2 : 16,
-              ),
-              onMapCreated: _onMapCreated,
-              markers: _markers,
-              polylines: _polylines,
-              myLocationEnabled: _hasLocationPermission == true,
-              myLocationButtonEnabled: _hasLocationPermission == true,
-              zoomControlsEnabled: false,
+            child: Stack(
+              children: [
+                GoogleMap(
+                  key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
+                  initialCameraPosition: CameraPosition(
+                    target: _currentPosition ?? const LatLng(0, 0),
+                    zoom: _currentPosition == null ? 2 : 16,
+                  ),
+                  onMapCreated: _onMapCreated,
+                  onCameraMoveStarted: () {
+                    if (_autoFollow) {
+                      setState(() {
+                        _autoFollow = false;
+                      });
+                    }
+                  },
+                  markers: _markers,
+                  polylines: _polylines,
+                  myLocationEnabled: _hasLocationPermission == true,
+                  myLocationButtonEnabled: _hasLocationPermission == true,
+                  zoomControlsEnabled: false,
+                ),
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: FloatingActionButton.small(
+                    heroTag: 'recenter',
+                    onPressed: _currentPosition == null
+                        ? null
+                        : () {
+                            setState(() {
+                              _autoFollow = true;
+                            });
+                            _followCamera(_currentPosition!);
+                          },
+                    tooltip: 'Recenter',
+                    child: Icon(_autoFollow ? Icons.my_location : Icons.center_focus_strong),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -153,51 +175,42 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            TextFormField(
+              controller: _routeController,
+              minLines: 2,
+              maxLines: 4,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                labelText: 'Route input',
+                hintText: 'Paste encoded polyline or Routes API JSON',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<TourOption>(
-                    isExpanded: true,
-                    value: _selectedTour,
-                    items: _tourOptions
-                        .map(
-                          (option) => DropdownMenuItem<TourOption>(
-                            value: option,
-                            child: Text(option.label, overflow: TextOverflow.ellipsis),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _tourOptions.isEmpty
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _selectedTour = value;
-                            });
-                          },
-                    decoration: InputDecoration(
-                      labelText: _isLoadingTours ? 'Loading tours...' : 'Select tour',
-                      isDense: true,
-                    ),
+                  child: FilledButton(
+                    onPressed: _routeController.text.trim().isEmpty ? null : _loadRouteFromInput,
+                    child: const Text('Load route'),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  tooltip: 'Refresh tours',
-                  onPressed: _isLoadingTours ? null : _loadTours,
-                  icon: const Icon(Icons.refresh),
-                ),
-                const SizedBox(width: 4),
-                FilledButton(
-                  onPressed: _isLoading ? null : _loadRoute,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Load'),
+                OutlinedButton(
+                  onPressed: _routeController.text.isEmpty
+                      ? null
+                      : () {
+                          _routeController.clear();
+                          setState(() {});
+                        },
+                  child: const Text('Clear'),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Accepts encoded polyline or Google Routes API JSON (routes[0].polyline.encodedPolyline).',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
             if (_showSetupBar)
@@ -365,65 +378,104 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     }
   }
 
-  Future<void> _loadRoute() async {
-    final tourId = _selectedTour?.tourId;
-    final apiKey = _apiKey;
-    final apiBase = _apiBase;
-
-    if (tourId == null || tourId.isEmpty) {
-      _showSnack('Select a tour first.');
-      return;
-    }
-    if (_apiKey.isEmpty) {
-      _showSnack('API key is not configured.');
+  Future<void> _loadRouteFromInput() async {
+    final input = _routeController.text.trim();
+    if (input.isEmpty) {
+      _showSnack('Paste an encoded polyline or Routes API JSON.');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
     _stopPlayback();
 
+    final polyline = _extractPolylineFromInput(input);
+    if (polyline == null || polyline.isEmpty) {
+      _showSnack('No encoded polyline found in input.');
+      return;
+    }
+
     try {
-      final response = await http.post(
-        Uri.parse('$apiBase/v1/getTour'),
-        headers: const {'Content-Type': 'application/json'},
-        body: jsonEncode({'tourId': tourId, 'apiKey': apiKey}),
-      );
-
-      if (response.statusCode != 200) {
-        _showSnack('Request failed (${response.statusCode}).');
-        return;
-      }
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final polyline = data['routePolyline'] as String? ?? '';
-      final tourName = data['tourName'] as String? ?? '';
-      if (polyline.isEmpty) {
-        _showSnack('No routePolyline found for this tour.');
-        return;
-      }
-
       final points = _decodePolyline(polyline);
       if (points.length < 2) {
-        _showSnack('Failed to decode route polyline.');
+        _showSnack('Failed to decode polyline.');
         return;
       }
-
       _setRoute(points);
-      setState(() {
-        _tourName = tourName.isEmpty ? null : tourName;
-      });
       _fitRouteToMap();
     } catch (error) {
       _showSnack('Failed to load route: $error');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+    }
+  }
+
+  String? _extractPolylineFromInput(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    final unquoted = _stripSurroundingQuotes(trimmed);
+    if (unquoted.startsWith('{') || unquoted.startsWith('[')) {
+      try {
+        final data = jsonDecode(unquoted);
+        final extracted = _extractPolylineFromJson(data);
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+      } catch (_) {
+        // Fall back to regex or raw input.
+      }
+      final match = RegExp(r'encodedPolyline\"?\s*:\s*\"([^\"]+)\"').firstMatch(unquoted);
+      if (match != null) {
+        return match.group(1);
       }
     }
+
+    return unquoted;
+  }
+
+  String _stripSurroundingQuotes(String value) {
+    if (value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'")))) {
+      return value.substring(1, value.length - 1);
+    }
+    return value;
+  }
+
+  String? _extractPolylineFromJson(dynamic data) {
+    if (data is Map) {
+      final direct = _extractPolylineFromMap(data.cast<String, dynamic>());
+      if (direct != null) {
+        return direct;
+      }
+    }
+    if (data is List) {
+      for (final item in data) {
+        final found = _extractPolylineFromJson(item);
+        if (found != null) {
+          return found;
+        }
+      }
+    }
+    return null;
+  }
+
+  String? _extractPolylineFromMap(Map<String, dynamic> map) {
+    final direct = map['encodedPolyline'] ?? map['routePolyline'] ?? map['polyline'];
+    if (direct is String) {
+      return direct;
+    }
+    final polylineNode = map['polyline'];
+    if (polylineNode is Map) {
+      final encoded = polylineNode['encodedPolyline'];
+      if (encoded is String) {
+        return encoded;
+      }
+    }
+    final routes = map['routes'];
+    if (routes is List && routes.isNotEmpty) {
+      return _extractPolylineFromJson(routes);
+    }
+    return null;
   }
 
   void _setRoute(List<LatLng> points) {
@@ -529,7 +581,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   }
 
   void _followCamera(LatLng position) {
-    if (_mapController == null) {
+    if (_mapController == null || !_autoFollow) {
       return;
     }
     _mapController!.moveCamera(CameraUpdate.newLatLng(position));
@@ -719,67 +771,6 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _loadTours() async {
-    setState(() {
-      _isLoadingTours = true;
-    });
-    try {
-      final response = await http
-          .get(Uri.parse(_widgetSitemapUrl))
-          .timeout(const Duration(seconds: 12));
-      if (response.statusCode != 200) {
-        _showSnack('Failed to fetch tours (${response.statusCode}).');
-        return;
-      }
-      final options = _parseToursFromSitemap(response.body);
-      if (options.isEmpty) {
-        _showSnack('No tours found in sitemap.');
-        return;
-      }
-      setState(() {
-        _tourOptions = options;
-        _selectedTour ??= options.first;
-      });
-    } on TimeoutException {
-      _showSnack('Timed out fetching tours. Check network and try again.');
-    } catch (error) {
-      _showSnack('Failed to fetch tours: $error');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingTours = false;
-        });
-      }
-    }
-  }
-
-  List<TourOption> _parseToursFromSitemap(String xml) {
-    final locMatches = RegExp(r'<loc>([^<]+)</loc>').allMatches(xml);
-    final seen = <String>{};
-    final options = <TourOption>[];
-
-    for (final match in locMatches) {
-      final url = match.group(1);
-      if (url == null || !url.contains('tourId=')) {
-        continue;
-      }
-      final idMatch = RegExp(r'tourId=([0-9a-fA-F-]{36})').firstMatch(url);
-      if (idMatch == null) {
-        continue;
-      }
-      final tourId = idMatch.group(1)!;
-      final langMatch = RegExp(r'lang=([a-zA-Z-]+)').firstMatch(url);
-      final lang = langMatch?.group(1);
-      final key = '$tourId|${lang ?? ''}';
-      if (seen.add(key)) {
-        options.add(TourOption(tourId: tourId, language: lang));
-      }
-    }
-
-    options.sort((a, b) => a.label.compareTo(b.label));
-    return options;
-  }
-
   String _statusLabel(bool? value) {
     if (value == null) {
       return '…';
@@ -897,75 +888,91 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     if (!mounted) {
       return;
     }
+    var showSetupBar = _showSetupBar;
+    var showDebugPanel = _showDebugPanel;
+    var showMockMarker = _showMockMarker;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (context) {
-        return SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text('Settings', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                title: const Text('Show setup bar'),
-                value: _showSetupBar,
-                onChanged: (value) {
-                  setState(() {
-                    _showSetupBar = value;
-                  });
-                },
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text('Settings', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    title: const Text('Show setup bar'),
+                    value: showSetupBar,
+                    onChanged: (value) {
+                      setModalState(() {
+                        showSetupBar = value;
+                      });
+                      setState(() {
+                        _showSetupBar = value;
+                      });
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('Show debug panel'),
+                    value: showDebugPanel,
+                    onChanged: (value) {
+                      setModalState(() {
+                        showDebugPanel = value;
+                      });
+                      setState(() {
+                        _showDebugPanel = value;
+                      });
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('Show mocked marker'),
+                    value: showMockMarker,
+                    onChanged: (value) {
+                      setModalState(() {
+                        showMockMarker = value;
+                      });
+                      setState(() {
+                        _showMockMarker = value;
+                        if (!_showMockMarker) {
+                          _markers = const {};
+                        } else if (_currentPosition != null) {
+                          _markers = {
+                            Marker(
+                              markerId: const MarkerId('current'),
+                              position: _currentPosition!,
+                              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                              infoWindow: const InfoWindow(title: 'Mocked GPS'),
+                              zIndex: 1,
+                            ),
+                          };
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _runStartupChecks(showDialogs: true);
+                    },
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Run setup checks'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      _refreshMockAppStatus();
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Refresh mock status'),
+                  ),
+                ],
               ),
-              SwitchListTile(
-                title: const Text('Show debug panel'),
-                value: _showDebugPanel,
-                onChanged: (value) {
-                  setState(() {
-                    _showDebugPanel = value;
-                  });
-                },
-              ),
-              SwitchListTile(
-                title: const Text('Show mocked marker'),
-                value: _showMockMarker,
-                onChanged: (value) {
-                  setState(() {
-                    _showMockMarker = value;
-                    if (!_showMockMarker) {
-                      _markers = const {};
-                    } else if (_currentPosition != null) {
-                      _markers = {
-                        Marker(
-                          markerId: const MarkerId('current'),
-                          position: _currentPosition!,
-                          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                          infoWindow: const InfoWindow(title: 'Mocked GPS'),
-                          zIndex: 1,
-                        ),
-                      };
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _runStartupChecks(showDialogs: true);
-                },
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Run setup checks'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () {
-                  _refreshMockAppStatus();
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh mock status'),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -999,13 +1006,4 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     );
     return result ?? false;
   }
-}
-
-class TourOption {
-  const TourOption({required this.tourId, this.language});
-
-  final String tourId;
-  final String? language;
-
-  String get label => language == null ? tourId : '$tourId ($language)';
 }

@@ -1,4 +1,4 @@
-# GPS Spoofer (WalksTo) — Project Notes
+# GPS Spoofer — Project Notes
 
 ## Context
 - Intended as an open-source GPS spoofing app (name TBD).
@@ -18,9 +18,8 @@
 
 ## Configuration
 - Google Maps key: add `MAPS_API_KEY=...` to `android/local.properties` (not committed).
-- VoxTour API: pass at run time:
-  - `--dart-define=VOXTOUR_API_KEY=...`
-  - optional: `--dart-define=VOXTOUR_API_BASE=https://api.voxtour.ai`
+- Route input: paste an encoded polyline or a Google Routes API JSON response
+  (expected path: `routes[0].polyline.encodedPolyline`).
 
 ## Constraints / process
 - Keep scope minimal and avoid extra complexity.

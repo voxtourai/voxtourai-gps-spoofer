@@ -13,7 +13,7 @@ import 'package:http/http.dart' as http;
 const String _apiBase = 'https://api.voxtour.ai';
 const String _apiKey = '96f5b69a-6f16-4b36-ae05-b85a7dd728a6';
 const double _feetToMeters = 0.3048;
-const String _widgetSitemapUrl = 'https://widget.voxtour.ai/ssr/widget/sitemap/index';
+const String _widgetSitemapUrl = 'https://bff.voxtour.ai/ssr/widget/sitemap/index';
 
 void main() {
   runApp(const SpooferApp());

@@ -12,6 +12,38 @@ import 'package:permission_handler/permission_handler.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
+const String _darkMapStyle = r'''
+[
+  {"elementType":"geometry","stylers":[{"color":"#1d2c4d"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#8ec3b9"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#1a3646"}]},
+  {"featureType":"administrative.country","elementType":"geometry.stroke","stylers":[{"color":"#4b6878"}]},
+  {"featureType":"administrative.land_parcel","elementType":"labels.text.fill","stylers":[{"color":"#64779e"}]},
+  {"featureType":"administrative.province","elementType":"geometry.stroke","stylers":[{"color":"#4b6878"}]},
+  {"featureType":"landscape.man_made","elementType":"geometry.stroke","stylers":[{"color":"#334e87"}]},
+  {"featureType":"landscape.natural","elementType":"geometry","stylers":[{"color":"#023e58"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#283d6a"}]},
+  {"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#6f9ba5"}]},
+  {"featureType":"poi","elementType":"labels.text.stroke","stylers":[{"color":"#1d2c4d"}]},
+  {"featureType":"poi.park","elementType":"geometry.fill","stylers":[{"color":"#023e58"}]},
+  {"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#3C7680"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#304a7d"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#98a5be"}]},
+  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#1d2c4d"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#2c6675"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#255763"}]},
+  {"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#b0d5ce"}]},
+  {"featureType":"road.highway","elementType":"labels.text.stroke","stylers":[{"color":"#023e58"}]},
+  {"featureType":"transit","elementType":"labels.text.fill","stylers":[{"color":"#98a5be"}]},
+  {"featureType":"transit","elementType":"labels.text.stroke","stylers":[{"color":"#1d2c4d"}]},
+  {"featureType":"transit.line","elementType":"geometry.fill","stylers":[{"color":"#283d6a"}]},
+  {"featureType":"transit.station","elementType":"geometry","stylers":[{"color":"#3a4762"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0e1626"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4e6d70"}]}
+]
+''';
+
+final ValueNotifier<ThemeMode> _themeMode = ValueNotifier(ThemeMode.system);
 
 void main() {
   runApp(const SpooferApp());
@@ -22,13 +54,24 @@ class SpooferApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'GPS Spoofer',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.blueGrey,
-        useMaterial3: true,
-      ),
-      home: const SpooferScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: _themeMode,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          title: 'GPS Spoofer',
+          theme: ThemeData(
+            colorSchemeSeed: Colors.blueGrey,
+            useMaterial3: true,
+          ),
+          darkTheme: ThemeData(
+            colorSchemeSeed: Colors.blueGrey,
+            brightness: Brightness.dark,
+            useMaterial3: true,
+          ),
+          themeMode: mode,
+          home: const SpooferScreen(),
+        );
+      },
     );
   }
 }
@@ -49,6 +92,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   bool _pendingFitRoute = false;
   bool _autoFollow = true;
   bool _isProgrammaticMove = false;
+  Brightness? _lastBrightness;
 
   List<LatLng> _routePoints = [];
   List<double> _cumulativeMeters = [];
@@ -89,6 +133,12 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     _ticker?.dispose();
     _routeController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    unawaited(_applyMapStyle());
   }
 
   @override
@@ -457,9 +507,22 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
+    unawaited(_applyMapStyle());
     if (_pendingFitRoute) {
       _fitRouteToMap();
     }
+  }
+
+  Future<void> _applyMapStyle() async {
+    if (_mapController == null) {
+      return;
+    }
+    final brightness = Theme.of(context).brightness;
+    if (_lastBrightness == brightness) {
+      return;
+    }
+    _lastBrightness = brightness;
+    await _mapController!.setMapStyle(brightness == Brightness.dark ? _darkMapStyle : null);
   }
 
   Future<void> _loadRouteFromInput() async {
@@ -981,6 +1044,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     var showSetupBar = _showSetupBar;
     var showDebugPanel = _showDebugPanel;
     var showMockMarker = _showMockMarker;
+    var allowDarkMode = _themeMode.value != ThemeMode.light;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -1040,6 +1104,17 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                           };
                         }
                       });
+                    },
+                  ),
+                  SwitchListTile(
+                    title: const Text('Dark mode'),
+                    subtitle: const Text('Follows system when enabled'),
+                    value: allowDarkMode,
+                    onChanged: (value) {
+                      setModalState(() {
+                        allowDarkMode = value;
+                      });
+                      _themeMode.value = value ? ThemeMode.system : ThemeMode.light;
                     },
                   ),
                   const SizedBox(height: 12),

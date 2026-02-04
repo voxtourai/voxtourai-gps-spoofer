@@ -281,6 +281,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         _isProgrammaticMove = false;
                       }
                     },
+                    onTap: (position) {
+                      if (_routePoints.isNotEmpty) {
+                        return;
+                      }
+                      _setManualLocation(position);
+                    },
                     markers: _markers,
                     polylines: _polylines,
                     myLocationEnabled: _hasLocationPermission == true,
@@ -952,6 +958,31 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           : const {};
     });
 
+    unawaited(_sendMockLocation(position));
+    _followCamera(position);
+  }
+
+  void _setManualLocation(LatLng position) {
+    if (_routePoints.isNotEmpty) {
+      return;
+    }
+    _stopPlayback();
+    setState(() {
+      _currentPosition = position;
+      _lastInjectedPosition = position;
+      _autoFollow = true;
+      _markers = _showMockMarker
+          ? {
+              Marker(
+                markerId: const MarkerId('current'),
+                position: position,
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                infoWindow: const InfoWindow(title: 'Mocked GPS'),
+                zIndex: 1,
+              ),
+            }
+          : const {};
+    });
     unawaited(_sendMockLocation(position));
     _followCamera(position);
   }

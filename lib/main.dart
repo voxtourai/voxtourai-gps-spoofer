@@ -326,11 +326,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         ),
         actions: [
           IconButton(
-            tooltip: 'Search',
-            icon: const Icon(Icons.search),
-            onPressed: _openSearchSheet,
-          ),
-          IconButton(
             tooltip: 'Help',
             icon: const Icon(Icons.help_outline),
             onPressed: _openHelpSheet,
@@ -924,7 +919,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       Navigator.of(context).pop();
     }
 
-    await showModalBottomSheet<void>(
+    final sheetFuture = showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -932,68 +927,78 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         return StatefulBuilder(
           builder: (context, setSheetState) {
             return SafeArea(
-              child: AnimatedPadding(
-                duration: const Duration(milliseconds: 150),
-                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: FractionallySizedBox(
-                  heightFactor: 0.7,
-                  widthFactor: 1,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                        child: Row(
-                          children: [
-                            Text('Search', style: Theme.of(context).textTheme.titleMedium),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () => closeSheet(context),
-                            ),
-                          ],
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.7,
+                width: double.infinity,
+                child: AnimatedPadding(
+                  duration: const Duration(milliseconds: 150),
+                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                          child: Row(
+                            children: [
+                              Text('Search', style: Theme.of(context).textTheme.titleMedium),
+                              const Spacer(),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => closeSheet(context),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: TextField(
-                          controller: controller,
-                          autofocus: true,
-                          decoration: InputDecoration(
-                            hintText: 'Search places',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: searching
-                                ? const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: TextField(
+                            controller: controller,
+                            autofocus: true,
+                            decoration: InputDecoration(
+                              hintText: 'Search places',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: searching
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                    )
+                                  : IconButton(
+                                      icon: const Icon(Icons.arrow_forward),
+                                      onPressed: () => runSearch(controller.text, setSheetState),
                                     ),
-                                  )
-                                : IconButton(
-                                    icon: const Icon(Icons.arrow_forward),
-                                    onPressed: () => runSearch(controller.text, setSheetState),
-                                  ),
-                            border: const OutlineInputBorder(),
+                              border: const OutlineInputBorder(),
+                            ),
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (value) => runSearch(value, setSheetState),
                           ),
-                          textInputAction: TextInputAction.search,
-                          onSubmitted: (value) => runSearch(value, setSheetState),
                         ),
                       ),
                       if (error != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                          child: Text(error!, style: Theme.of(context).textTheme.bodySmall),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: Text(error!, style: Theme.of(context).textTheme.bodySmall),
+                          ),
                         ),
-                      Expanded(
-                        child: results.isEmpty
-                            ? const Center(child: Text('No results yet.'))
-                            : ListView.separated(
-                                itemCount: results.length,
-                                separatorBuilder: (_, __) => const Divider(height: 1),
-                                itemBuilder: (context, index) {
-                                  final item = results[index];
-                                  return ListTile(
+                      if (results.isEmpty)
+                        const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(child: Text('No results yet.')),
+                        )
+                      else
+                        SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final item = results[index];
+                              return Column(
+                                children: [
+                                  ListTile(
                                     title: Text(item.address),
                                     onTap: () {
                                       closeSheet(context);
@@ -1005,10 +1010,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                         );
                                       });
                                     },
-                                  );
-                                },
-                              ),
-                      ),
+                                  ),
+                                  if (index != results.length - 1) const Divider(height: 1),
+                                ],
+                              );
+                            },
+                            childCount: results.length,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1018,7 +1027,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         );
       },
     );
-    sheetOpen = false;
+    sheetFuture.whenComplete(() {
+      sheetOpen = false;
+    });
+    await sheetFuture;
     controller.dispose();
   }
 

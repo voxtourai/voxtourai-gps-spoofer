@@ -1392,39 +1392,62 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (index < 0 || index >= _customPoints.length) {
       return;
     }
-    final controller = TextEditingController(text: _customNames[index]);
+    final currentName = _customNames[index];
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    var canSave = false;
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rename waypoint'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Waypoint name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Rename waypoint'),
+            content: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: currentName,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                final nextCanSave = value.trim().isNotEmpty;
+                if (nextCanSave != canSave) {
+                  setDialogState(() {
+                    canSave = nextCanSave;
+                  });
+                }
+              },
+              onSubmitted: (value) {
+                if (value.trim().isEmpty) {
+                  return;
+                }
+                Navigator.of(context).pop(value.trim());
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: canSave ? () => Navigator.of(context).pop(controller.text.trim()) : null,
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
+    focusNode.dispose();
     if (!mounted) {
       return;
     }
     if (result == null) {
       return;
     }
-    final name = result.isEmpty ? _defaultWaypointName(index) : result;
     setState(() {
-      _customNames[index] = name;
+      _customNames[index] = result;
       _rebuildCustomMarkers();
       _refreshMarkers();
     });
@@ -1441,94 +1464,107 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       showDragHandle: true,
       builder: (context) {
         final height = MediaQuery.of(context).size.height * 0.6;
-        return SafeArea(
-          child: SizedBox(
-            height: height,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                  child: Row(
-                    children: [
-                      Text('Waypoints', style: Theme.of(context).textTheme.titleMedium),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Save route',
-                        icon: const Icon(Icons.save),
-                        onPressed: () async {
-                          await _saveCustomRoute();
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              child: SizedBox(
+                height: height,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      child: Row(
+                        children: [
+                          Text('Waypoints', style: Theme.of(context).textTheme.titleMedium),
+                          const Spacer(),
+                          IconButton(
+                            tooltip: 'Save route',
+                            icon: const Icon(Icons.save),
+                            onPressed: () async {
+                              await _saveCustomRoute();
+                            },
+                          ),
+                          IconButton(
+                            tooltip: 'Load route',
+                            icon: const Icon(Icons.folder_open),
+                            onPressed: () async {
+                              final loaded = await _openSavedRoutes();
+                              if (loaded && context.mounted) {
+                                Navigator.of(context).pop();
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ReorderableListView.builder(
+                        itemCount: _customPoints.length,
+                        buildDefaultDragHandles: false,
+                        onReorder: (oldIndex, newIndex) {
+                          _reorderCustomPoints(oldIndex, newIndex);
+                          setSheetState(() {});
+                        },
+                        itemBuilder: (context, index) {
+                          final name = _customNames.length > index
+                              ? _customNames[index]
+                              : _defaultWaypointName(index);
+                          final position = _customPoints[index];
+                          return ListTile(
+                            key: ValueKey('wp_item_$index'),
+                            dense: true,
+                            title: Text(name),
+                            subtitle: Text(
+                              '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+                            ),
+                            leading: CircleAvatar(
+                              radius: 14,
+                              child: Text('${index + 1}', style: Theme.of(context).textTheme.labelSmall),
+                            ),
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              _selectCustomPoint(index);
+                            },
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit),
+                                  tooltip: 'Rename',
+                                  onPressed: () async {
+                                    await _renameCustomPoint(index);
+                                    if (context.mounted) {
+                                      setSheetState(() {});
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete),
+                                  tooltip: 'Delete',
+                                  onPressed: () {
+                                    _removeCustomPoint(index);
+                                    setSheetState(() {});
+                                  },
+                                ),
+                                ReorderableDragStartListener(
+                                  index: index,
+                                  child: const Icon(Icons.drag_handle),
+                                ),
+                              ],
+                            ),
+                          );
                         },
                       ),
-                      IconButton(
-                        tooltip: 'Load route',
-                        icon: const Icon(Icons.folder_open),
-                        onPressed: () async {
-                          final loaded = await _openSavedRoutes();
-                          if (loaded && context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: ReorderableListView.builder(
-                    itemCount: _customPoints.length,
-                    buildDefaultDragHandles: false,
-                    onReorder: (oldIndex, newIndex) {
-                      _reorderCustomPoints(oldIndex, newIndex);
-                    },
-                    itemBuilder: (context, index) {
-                      final name = _customNames.length > index
-                          ? _customNames[index]
-                          : _defaultWaypointName(index);
-                      final position = _customPoints[index];
-                      return ListTile(
-                        key: ValueKey('wp_item_$index'),
-                        dense: true,
-                        title: Text(name),
-                        subtitle: Text(
-                          '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
-                        ),
-                        leading: CircleAvatar(
-                          radius: 14,
-                          child: Text('${index + 1}', style: Theme.of(context).textTheme.labelSmall),
-                        ),
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          _selectCustomPoint(index);
-                        },
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit),
-                              tooltip: 'Rename',
-                              onPressed: () => _renameCustomPoint(index),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete),
-                              tooltip: 'Delete',
-                              onPressed: () => _removeCustomPoint(index),
-                            ),
-                            ReorderableDragStartListener(
-                              index: index,
-                              child: const Icon(Icons.drag_handle),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

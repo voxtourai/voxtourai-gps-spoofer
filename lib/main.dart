@@ -140,6 +140,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _backgroundEnabled = false;
   bool _backgroundBusy = false;
   bool _backgroundNotificationShown = false;
+  final List<String> _debugLog = [];
+  String? _lastDebugMessage;
+  DateTime? _lastDebugAt;
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
@@ -610,7 +613,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                 ),
               ),
             const SizedBox(height: 8),
-            if (_showDebugPanel) _buildDebugPanel(context),
           ],
         ),
       ),
@@ -673,8 +675,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           _mockError = null;
         });
       }
+      _appendDebugLog('Cleared mock location.');
     } on PlatformException catch (error) {
       _showSnack('Failed to clear mock location: ${error.message ?? error.code}');
+      _appendDebugLog('Clear mock failed: ${error.message ?? error.code}');
     }
   }
 
@@ -719,6 +723,33 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _selectedCustomIndex = null;
       _currentPosition = null;
       _lastInjectedPosition = null;
+    });
+  }
+
+  void _appendDebugLog(String message) {
+    final now = DateTime.now();
+    if (_lastDebugMessage == message &&
+        _lastDebugAt != null &&
+        now.difference(_lastDebugAt!) < const Duration(seconds: 3)) {
+      return;
+    }
+    _lastDebugMessage = message;
+    _lastDebugAt = now;
+    final stamp =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final entry = '[$stamp] $message';
+    if (!mounted) {
+      _debugLog.add(entry);
+      if (_debugLog.length > 50) {
+        _debugLog.removeRange(0, _debugLog.length - 50);
+      }
+      return;
+    }
+    setState(() {
+      _debugLog.add(entry);
+      if (_debugLog.length > 50) {
+        _debugLog.removeRange(0, _debugLog.length - 50);
+      }
     });
   }
 
@@ -788,6 +819,22 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               'Fused error: ${status?['fusedError']}',
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
             ),
+          const SizedBox(height: 6),
+          Text('Log', style: theme.textTheme.labelLarge),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            constraints: const BoxConstraints(maxHeight: 220),
+            child: _debugLog.isEmpty
+                ? Text('No debug events yet.', style: theme.textTheme.bodySmall)
+                : SingleChildScrollView(
+                    child: Text(_debugLog.join('\n'), style: theme.textTheme.bodySmall),
+                  ),
+          ),
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerLeft,
@@ -1670,6 +1717,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _sendMockLocation(LatLng position) async {
     final speedMps = _speedMps.abs();
+    final hadError = _mockError != null;
     try {
       final result = await _mockChannel.invokeMethod<Map<Object?, Object?>>('setMockLocation', {
         'latitude': position.latitude,
@@ -1696,10 +1744,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             _mockError = message;
           });
         }
+        _appendDebugLog('Mock apply failed: $details');
       } else if (_mockError != null && mounted) {
         setState(() {
           _mockError = null;
         });
+        if (hadError) {
+          _appendDebugLog('Mock apply ok.');
+        }
       }
     } on PlatformException catch (error) {
       final now = DateTime.now();
@@ -1710,6 +1762,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             _mockError = 'Mock location failed: ${error.message ?? error.code}';
           });
         }
+        _appendDebugLog('Mock exception: ${error.message ?? error.code}');
       }
     }
   }
@@ -1988,6 +2041,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           _isMockLocationApp = isSelected;
         });
       }
+      _appendDebugLog('Mock app: ${selected ?? '—'} selected=${isSelected ? 'YES' : 'NO'}');
     } catch (_) {
       // Ignore refresh failures.
     }
@@ -2229,19 +2283,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           icon: const Icon(Icons.check_circle_outline),
                           label: const Text('Run setup checks'),
                         ),
-                        const SizedBox(height: 6),
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            visualDensity: compactDensity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            textStyle: Theme.of(context).textTheme.bodySmall,
+                        if (showDebugPanel) ...[
+                          const Divider(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildDebugPanel(context),
                           ),
-                          onPressed: () {
-                            _refreshMockAppStatus();
-                          },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Refresh mock status'),
-                        ),
+                        ],
                       ],
                     );
                   },

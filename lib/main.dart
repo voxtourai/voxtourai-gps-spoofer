@@ -45,6 +45,13 @@ const String _darkMapStyle = r'''
 
 final ValueNotifier<ThemeMode> _themeMode = ValueNotifier(ThemeMode.system);
 
+enum DarkModeSetting {
+  on,
+  uiOnly,
+  mapOnly,
+  off,
+}
+
 void main() {
   runApp(const SpooferApp());
 }
@@ -92,7 +99,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   bool _pendingFitRoute = false;
   bool _autoFollow = true;
   bool _isProgrammaticMove = false;
-  Brightness? _lastBrightness;
+  bool? _lastMapStyleDark;
 
   List<LatLng> _routePoints = [];
   List<double> _cumulativeMeters = [];
@@ -119,6 +126,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   bool _showMockMarker = false;
   bool _showSetupBar = false;
   bool _showDebugPanel = false;
+  DarkModeSetting _darkModeSetting = DarkModeSetting.on;
 
   @override
   void initState() {
@@ -364,49 +372,43 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     if (!mounted) {
       return;
     }
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 8,
-            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+        return AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          title: Text(
+            'Load route',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Load route', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              TextField(
-                controller: controller,
-                minLines: 3,
-                maxLines: 6,
-                decoration: const InputDecoration(
-                  hintText: 'Paste encoded polyline or Routes API JSON',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: () {
-                  _routeController.text = controller.text;
-                  Navigator.of(context).pop();
-                  _loadRouteFromInput();
-                },
-                child: const Text('Load'),
-              ),
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-            ],
+          content: TextField(
+            controller: controller,
+            minLines: 3,
+            maxLines: 6,
+            decoration: const InputDecoration(
+              hintText: 'Paste encoded polyline or Routes API JSON',
+              border: OutlineInputBorder(),
+              isDense: true,
+              contentPadding: EdgeInsets.fromLTRB(12, 10, 12, 10),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                _routeController.text = controller.text;
+                Navigator.of(context).pop();
+                _loadRouteFromInput();
+              },
+              child: const Text('Load'),
+            ),
+          ],
         );
       },
     );
@@ -517,12 +519,42 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     if (_mapController == null) {
       return;
     }
-    final brightness = Theme.of(context).brightness;
-    if (_lastBrightness == brightness) {
+    final useDarkStyle = _shouldUseDarkMapStyle();
+    if (_lastMapStyleDark == useDarkStyle) {
       return;
     }
-    _lastBrightness = brightness;
-    await _mapController!.setMapStyle(brightness == Brightness.dark ? _darkMapStyle : null);
+    _lastMapStyleDark = useDarkStyle;
+    await _mapController!.setMapStyle(useDarkStyle ? _darkMapStyle : null);
+  }
+
+  bool _shouldUseDarkMapStyle() {
+    switch (_darkModeSetting) {
+      case DarkModeSetting.on:
+        return SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+      case DarkModeSetting.uiOnly:
+        return false;
+      case DarkModeSetting.mapOnly:
+        return true;
+      case DarkModeSetting.off:
+        return false;
+    }
+  }
+
+  void _applyDarkModeSetting(DarkModeSetting setting) {
+    _darkModeSetting = setting;
+    switch (setting) {
+      case DarkModeSetting.on:
+        _themeMode.value = ThemeMode.system;
+        break;
+      case DarkModeSetting.uiOnly:
+        _themeMode.value = ThemeMode.dark;
+        break;
+      case DarkModeSetting.mapOnly:
+      case DarkModeSetting.off:
+        _themeMode.value = ThemeMode.light;
+        break;
+    }
+    unawaited(_applyMapStyle());
   }
 
   Future<void> _loadRouteFromInput() async {
@@ -1044,101 +1076,196 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     var showSetupBar = _showSetupBar;
     var showDebugPanel = _showDebugPanel;
     var showMockMarker = _showMockMarker;
-    var allowDarkMode = _themeMode.value != ThemeMode.light;
-    await showModalBottomSheet<void>(
+    var darkModeSetting = _darkModeSetting;
+    await showGeneralDialog<void>(
       context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text('Settings', style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 12),
-                  SwitchListTile(
-                    title: const Text('Show setup bar'),
-                    value: showSetupBar,
-                    onChanged: (value) {
-                      setModalState(() {
-                        showSetupBar = value;
-                      });
-                      setState(() {
-                        _showSetupBar = value;
-                      });
-                    },
-                  ),
-                  SwitchListTile(
-                    title: const Text('Show debug panel'),
-                    value: showDebugPanel,
-                    onChanged: (value) {
-                      setModalState(() {
-                        showDebugPanel = value;
-                      });
-                      setState(() {
-                        _showDebugPanel = value;
-                      });
-                    },
-                  ),
-                  SwitchListTile(
-                    title: const Text('Show mocked marker'),
-                    value: showMockMarker,
-                    onChanged: (value) {
-                      setModalState(() {
-                        showMockMarker = value;
-                      });
-                      setState(() {
-                        _showMockMarker = value;
-                        if (!_showMockMarker) {
-                          _markers = const {};
-                        } else if (_currentPosition != null) {
-                          _markers = {
-                            Marker(
-                              markerId: const MarkerId('current'),
-                              position: _currentPosition!,
-                              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                              infoWindow: const InfoWindow(title: 'Mocked GPS'),
-                              zIndex: 1,
+      barrierDismissible: true,
+      barrierLabel: 'Settings',
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, _, __) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: SafeArea(
+            child: Material(
+              elevation: 6,
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+              child: SizedBox(
+                width: 280,
+                child: StatefulBuilder(
+                  builder: (context, setModalState) {
+                    final denseStyle = Theme.of(context).textTheme.bodySmall;
+                    const compactDensity = VisualDensity(horizontal: -2, vertical: -4);
+                    Widget buildToggle({
+                      required String title,
+                      required bool value,
+                      required ValueChanged<bool> onChanged,
+                    }) {
+                      return ListTile(
+                        dense: true,
+                        visualDensity: compactDensity,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(title, style: denseStyle),
+                        trailing: Transform.scale(
+                          scale: 0.85,
+                          child: Switch(
+                            value: value,
+                            onChanged: onChanged,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        onTap: () => onChanged(!value),
+                      );
+                    }
+
+                    String darkModeLabel(DarkModeSetting setting) {
+                      switch (setting) {
+                        case DarkModeSetting.on:
+                          return 'On';
+                        case DarkModeSetting.uiOnly:
+                          return 'UI only';
+                        case DarkModeSetting.mapOnly:
+                          return 'Map only';
+                        case DarkModeSetting.off:
+                          return 'Off';
+                      }
+                    }
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                      children: [
+                        Row(
+                          children: [
+                            Text('Settings', style: Theme.of(context).textTheme.titleMedium),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () => Navigator.of(context).pop(),
+                              splashRadius: 18,
                             ),
-                          };
-                        }
-                      });
-                    },
-                  ),
-                  SwitchListTile(
-                    title: const Text('Dark mode'),
-                    subtitle: const Text('Follows system when enabled'),
-                    value: allowDarkMode,
-                    onChanged: (value) {
-                      setModalState(() {
-                        allowDarkMode = value;
-                      });
-                      _themeMode.value = value ? ThemeMode.system : ThemeMode.light;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _runStartupChecks(showDialogs: true);
-                    },
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Run setup checks'),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _refreshMockAppStatus();
-                    },
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Refresh mock status'),
-                  ),
-                ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        buildToggle(
+                          title: 'Show setup bar',
+                          value: showSetupBar,
+                          onChanged: (value) {
+                            setModalState(() {
+                              showSetupBar = value;
+                            });
+                            setState(() {
+                              _showSetupBar = value;
+                            });
+                          },
+                        ),
+                        buildToggle(
+                          title: 'Show debug panel',
+                          value: showDebugPanel,
+                          onChanged: (value) {
+                            setModalState(() {
+                              showDebugPanel = value;
+                            });
+                            setState(() {
+                              _showDebugPanel = value;
+                            });
+                          },
+                        ),
+                        buildToggle(
+                          title: 'Show mocked marker',
+                          value: showMockMarker,
+                          onChanged: (value) {
+                            setModalState(() {
+                              showMockMarker = value;
+                            });
+                            setState(() {
+                              _showMockMarker = value;
+                              if (!_showMockMarker) {
+                                _markers = const {};
+                              } else if (_currentPosition != null) {
+                                _markers = {
+                                  Marker(
+                                    markerId: const MarkerId('current'),
+                                    position: _currentPosition!,
+                                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                                    infoWindow: const InfoWindow(title: 'Mocked GPS'),
+                                    zIndex: 1,
+                                  ),
+                                };
+                              }
+                            });
+                          },
+                        ),
+                        ListTile(
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('Dark mode', style: denseStyle),
+                          trailing: DropdownButtonHideUnderline(
+                            child: DropdownButton<DarkModeSetting>(
+                              isDense: true,
+                              value: darkModeSetting,
+                              items: DarkModeSetting.values
+                                  .map(
+                                    (setting) => DropdownMenuItem(
+                                      value: setting,
+                                      child: Text(darkModeLabel(setting)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) {
+                                  return;
+                                }
+                                setModalState(() {
+                                  darkModeSetting = value;
+                                });
+                                setState(() {
+                                  _applyDarkModeSetting(value);
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 16),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            visualDensity: compactDensity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _runStartupChecks(showDialogs: true);
+                          },
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: const Text('Run setup checks'),
+                        ),
+                        const SizedBox(height: 6),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: compactDensity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          onPressed: () {
+                            _refreshMockAppStatus();
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Refresh mock status'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
-            );
-          },
+            ),
+          ),
         );
+      },
+      transitionBuilder: (context, anim, _, child) {
+        final offset = Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(
+          CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+        );
+        return SlideTransition(position: offset, child: child);
       },
     );
   }

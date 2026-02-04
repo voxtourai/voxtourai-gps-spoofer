@@ -48,6 +48,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   GoogleMapController? _mapController;
   bool _pendingFitRoute = false;
   bool _autoFollow = true;
+  bool _isProgrammaticMove = false;
 
   List<LatLng> _routePoints = [];
   List<double> _cumulativeMeters = [];
@@ -110,25 +111,42 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
             flex: 15,
             child: Stack(
               children: [
-                GoogleMap(
-                  key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
-                  initialCameraPosition: CameraPosition(
-                    target: _currentPosition ?? const LatLng(0, 0),
-                    zoom: _currentPosition == null ? 2 : 16,
-                  ),
-                  onMapCreated: _onMapCreated,
-                  onCameraMoveStarted: () {
+                Listener(
+                  onPointerDown: (_) {
                     if (_autoFollow) {
                       setState(() {
                         _autoFollow = false;
                       });
                     }
                   },
-                  markers: _markers,
-                  polylines: _polylines,
-                  myLocationEnabled: _hasLocationPermission == true,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
+                  child: GoogleMap(
+                    key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
+                    initialCameraPosition: CameraPosition(
+                      target: _currentPosition ?? const LatLng(0, 0),
+                      zoom: _currentPosition == null ? 2 : 16,
+                    ),
+                    onMapCreated: _onMapCreated,
+                    onCameraMoveStarted: () {
+                      if (_isProgrammaticMove) {
+                        return;
+                      }
+                      if (_autoFollow) {
+                        setState(() {
+                          _autoFollow = false;
+                        });
+                      }
+                    },
+                    onCameraIdle: () {
+                      if (_isProgrammaticMove) {
+                        _isProgrammaticMove = false;
+                      }
+                    },
+                    markers: _markers,
+                    polylines: _polylines,
+                    myLocationEnabled: _hasLocationPermission == true,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: false,
+                  ),
                 ),
                 Positioned(
                   right: 12,
@@ -655,6 +673,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     if (_mapController == null || !_autoFollow) {
       return;
     }
+    _isProgrammaticMove = true;
     _mapController!.moveCamera(CameraUpdate.newLatLng(position));
   }
 

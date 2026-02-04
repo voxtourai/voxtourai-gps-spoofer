@@ -12,6 +12,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String _tosAcceptedKey = 'tos_accepted_v1';
@@ -149,6 +150,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _tosAccepted = false;
   int? _selectedCustomIndex;
   DarkModeSetting _darkModeSetting = DarkModeSetting.on;
+  PackageInfo? _packageInfo;
+  bool _packageInfoLoading = false;
+  int _titleTapCount = 0;
+  DateTime? _lastTitleTapAt;
   final List<_HelpSection> _helpSections = const [
     _HelpSection(
       'Getting started',
@@ -314,7 +319,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
-        title: const Text('GPS Spoofer'),
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleTitleTap,
+          child: const Text('GPS Spoofer'),
+        ),
         actions: [
           IconButton(
             tooltip: 'Help',
@@ -751,6 +760,76 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         _debugLog.removeRange(0, _debugLog.length - 50);
       }
     });
+  }
+
+  void _handleTitleTap() {
+    final now = DateTime.now();
+    if (_lastTitleTapAt == null || now.difference(_lastTitleTapAt!) > const Duration(seconds: 2)) {
+      _titleTapCount = 0;
+    }
+    _lastTitleTapAt = now;
+    _titleTapCount += 1;
+    if (_titleTapCount >= 5) {
+      _titleTapCount = 0;
+      unawaited(_showAppInfoDialog());
+    }
+  }
+
+  Future<PackageInfo?> _loadPackageInfo() async {
+    if (_packageInfo != null) {
+      return _packageInfo;
+    }
+    if (_packageInfoLoading) {
+      return null;
+    }
+    _packageInfoLoading = true;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _packageInfo = info;
+        });
+      } else {
+        _packageInfo = info;
+      }
+      return info;
+    } catch (_) {
+      return null;
+    } finally {
+      _packageInfoLoading = false;
+    }
+  }
+
+  Future<void> _showAppInfoDialog() async {
+    final info = await _loadPackageInfo();
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('App info'),
+          content: info == null
+              ? const Text('Version info unavailable.')
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Version: ${info.version}'),
+                    Text('Build: ${info.buildNumber}'),
+                    Text('App ID: ${info.packageName}'),
+                  ],
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildDebugPanel(BuildContext context) {

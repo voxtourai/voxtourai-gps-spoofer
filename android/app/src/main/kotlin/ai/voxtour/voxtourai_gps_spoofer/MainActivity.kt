@@ -4,6 +4,9 @@ import android.location.Location
 import android.location.LocationManager
 import android.location.LocationProvider
 import android.location.Criteria
+import android.location.Geocoder
+import android.os.Handler
+import android.os.Looper
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
@@ -135,6 +138,83 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     } catch (error: Exception) {
                         result.error("SETTINGS_ERROR", error.message, null)
+                    }
+                }
+                "geocodeAddress" -> {
+                    val query = call.argument<String>("query") ?: ""
+                    val maxResults = call.argument<Int>("maxResults") ?: 8
+                    if (query.isBlank()) {
+                        result.success(emptyList<Map<String, Any?>>())
+                        return@setMethodCallHandler
+                    }
+                    if (!Geocoder.isPresent()) {
+                        result.error("GEOCODER_UNAVAILABLE", "Geocoder not available on this device.", null)
+                        return@setMethodCallHandler
+                    }
+                    val geocoder = Geocoder(this)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        geocoder.getFromLocationName(query, maxResults, object : Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: MutableList<android.location.Address>) {
+                                val mapped = addresses.mapNotNull { address ->
+                                    val line = address.getAddressLine(0) ?: address.featureName
+                                    val lat = address.latitude
+                                    val lng = address.longitude
+                                    if (line == null) {
+                                        null
+                                    } else {
+                                        mapOf(
+                                            "address" to line,
+                                            "lat" to lat,
+                                            "lng" to lng,
+                                            "country" to address.countryName,
+                                            "adminArea" to address.adminArea,
+                                            "locality" to address.locality,
+                                            "subLocality" to address.subLocality,
+                                            "thoroughfare" to address.thoroughfare,
+                                            "subThoroughfare" to address.subThoroughfare
+                                        )
+                                    }
+                                }
+                                result.success(mapped)
+                            }
+
+                            override fun onError(errorMessage: String?) {
+                                result.error("GEOCODER_ERROR", errorMessage ?: "Geocode failed.", null)
+                            }
+                        })
+                    } else {
+                        Thread {
+                            try {
+                                val addresses = geocoder.getFromLocationName(query, maxResults) ?: emptyList()
+                                val mapped = addresses.mapNotNull { address ->
+                                    val line = address.getAddressLine(0) ?: address.featureName
+                                    val lat = address.latitude
+                                    val lng = address.longitude
+                                    if (line == null) {
+                                        null
+                                    } else {
+                                        mapOf(
+                                            "address" to line,
+                                            "lat" to lat,
+                                            "lng" to lng,
+                                            "country" to address.countryName,
+                                            "adminArea" to address.adminArea,
+                                            "locality" to address.locality,
+                                            "subLocality" to address.subLocality,
+                                            "thoroughfare" to address.thoroughfare,
+                                            "subThoroughfare" to address.subThoroughfare
+                                        )
+                                    }
+                                }
+                                Handler(Looper.getMainLooper()).post {
+                                    result.success(mapped)
+                                }
+                            } catch (error: Exception) {
+                                Handler(Looper.getMainLooper()).post {
+                                    result.error("GEOCODER_ERROR", error.message, null)
+                                }
+                            }
+                        }.start()
                     }
                 }
                 else -> result.notImplemented()

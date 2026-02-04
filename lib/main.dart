@@ -142,6 +142,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
   bool _tosAccepted = false;
+  int? _selectedCustomIndex;
   DarkModeSetting _darkModeSetting = DarkModeSetting.on;
 
   @override
@@ -285,6 +286,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                       }
                     },
                     onTap: (position) {
+                      if (_selectedCustomIndex != null) {
+                        setState(() {
+                          _selectedCustomIndex = null;
+                        });
+                        return;
+                      }
                       if (_routePoints.isNotEmpty || _customPoints.isNotEmpty) {
                         return;
                       }
@@ -299,6 +306,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     },
                     markers: _markers,
                     polylines: _polylines,
+                    mapToolbarEnabled: false,
+                    padding: EdgeInsets.only(
+                      bottom: _selectedCustomIndex != null ? 96 : 56,
+                      right: 56,
+                      left: 12,
+                    ),
                     myLocationEnabled: _hasLocationPermission == true,
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: false,
@@ -344,6 +357,25 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     child: Icon(_autoFollow ? Icons.my_location : Icons.center_focus_strong),
                   ),
                 ),
+                if (_selectedCustomIndex != null)
+                  Positioned(
+                    left: 12,
+                    right: 72,
+                    bottom: 12,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final idx = _selectedCustomIndex;
+                        if (idx != null) {
+                          _removeCustomPoint(idx);
+                        }
+                      },
+                      icon: const Icon(Icons.delete),
+                      label: Text('Delete waypoint ${(_selectedCustomIndex ?? 0) + 1}'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -565,6 +597,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _customMarkers = const {};
       _usingCustomRoute = false;
       _markers = const {};
+      _selectedCustomIndex = null;
       _currentPosition = null;
       _lastInjectedPosition = null;
     });
@@ -790,6 +823,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _customPoints = [];
       _customMarkers = const {};
       _usingCustomRoute = false;
+      _selectedCustomIndex = null;
       _setRoute(points);
       _fitRouteToMap();
     } catch (error) {
@@ -1015,13 +1049,16 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             _customPoints[i] = pos;
             _stopPlayback();
             _rebuildCustomRoute();
+            _selectCustomPoint(i);
           },
           onTap: () {
-            _removeCustomPoint(i);
+            _selectCustomPoint(i);
           },
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          infoWindow: InfoWindow(title: 'Waypoint ${i + 1}', snippet: 'Tap to remove · drag to move'),
-          zIndex: 0,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            i == _selectedCustomIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(title: 'Waypoint ${i + 1}', snippet: 'Hold and drag to move'),
+          zIndex: 2,
         ),
     };
   }
@@ -1029,14 +1066,27 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   void _rebuildCustomRoute() {
     _rebuildCustomMarkers();
     if (_customPoints.isEmpty) {
-      _routePoints = [];
-      _cumulativeMeters = [];
-      _totalDistanceMeters = 0;
-      _progress = 0;
-      _polylines = const {};
-      _currentPosition = null;
-      _lastInjectedPosition = null;
-      _refreshMarkers();
+      if (mounted) {
+        setState(() {
+          _routePoints = [];
+          _cumulativeMeters = [];
+          _totalDistanceMeters = 0;
+          _progress = 0;
+          _polylines = const {};
+          _currentPosition = null;
+          _lastInjectedPosition = null;
+          _refreshMarkers();
+        });
+      } else {
+        _routePoints = [];
+        _cumulativeMeters = [];
+        _totalDistanceMeters = 0;
+        _progress = 0;
+        _polylines = const {};
+        _currentPosition = null;
+        _lastInjectedPosition = null;
+        _refreshMarkers();
+      }
       return;
     }
 
@@ -1078,7 +1128,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (_customPoints.isEmpty) {
       _usingCustomRoute = false;
     }
+    if (_selectedCustomIndex == index) {
+      _selectedCustomIndex = null;
+    }
     _rebuildCustomRoute();
+  }
+
+  void _selectCustomPoint(int index) {
+    setState(() {
+      _selectedCustomIndex = index;
+      _rebuildCustomMarkers();
+      _refreshMarkers();
+    });
   }
 
   void _followCamera(LatLng position) {

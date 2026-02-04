@@ -4,12 +4,17 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:flutter/scheduler.dart' as scheduler;
 import 'package:flutter/services.dart';
+import 'package:flutter_background/flutter_background.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'
+    as flutter_local_notifications;
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+const String _tosAcceptedKey = 'tos_accepted_v1';
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 const String _darkMapStyle = r'''
@@ -90,7 +95,7 @@ class SpooferScreen extends StatefulWidget {
   State<SpooferScreen> createState() => _SpooferScreenState();
 }
 
-class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateMixin {
+class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserver {
   final TextEditingController _routeController = TextEditingController(text: _samplePolyline);
 
   final MethodChannel _mockChannel = const MethodChannel('voxtourai_gps_spoofer/mock_location');
@@ -112,8 +117,9 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   Set<Marker> _markers = const {};
 
   bool _isPlaying = false;
-  Ticker? _ticker;
-  Duration? _lastTick;
+  Timer? _playbackTimer;
+  DateTime? _lastTickAt;
+  bool _resumeAfterPause = false;
   String? _mockError;
   DateTime? _lastMockErrorAt;
   bool? _hasLocationPermission;
@@ -126,21 +132,96 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   bool _showMockMarker = false;
   bool _showSetupBar = false;
   bool _showDebugPanel = false;
+  bool _backgroundEnabled = false;
+  bool _backgroundBusy = false;
+  bool _backgroundNotificationShown = false;
+  final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
+      flutter_local_notifications.FlutterLocalNotificationsPlugin();
+  static const int _backgroundNotificationId = 1001;
+  bool _tosAccepted = false;
   DarkModeSetting _darkModeSetting = DarkModeSetting.on;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_runStartupChecks(showDialogs: true));
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(_initNotifications());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final accepted = await _ensureTosAccepted();
+      if (accepted) {
+        unawaited(_runStartupChecks(showDialogs: true));
+      }
     });
   }
 
   @override
   void dispose() {
-    _ticker?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _playbackTimer?.cancel();
+    unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_backgroundEnabled) {
+      if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+        unawaited(_showBackgroundNotification());
+      } else if (state == AppLifecycleState.resumed) {
+        unawaited(_cancelBackgroundNotification());
+      }
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      if (_resumeAfterPause) {
+        _resumeAfterPause = false;
+        _startPlayback();
+      }
+    } else {
+      if (_isPlaying) {
+        _resumeAfterPause = true;
+        _stopPlayback();
+      }
+    }
+  }
+
+  Future<void> _initNotifications() async {
+    final androidSettings =
+        flutter_local_notifications.AndroidInitializationSettings('@mipmap/ic_launcher');
+    final settings = flutter_local_notifications.InitializationSettings(android: androidSettings);
+    await _notifications.initialize(settings);
+  }
+
+  Future<void> _showBackgroundNotification() async {
+    if (_backgroundNotificationShown) {
+      return;
+    }
+    final androidDetails = flutter_local_notifications.AndroidNotificationDetails(
+      'background_mode',
+      'Background mode',
+      channelDescription: 'Indicates mock GPS can run in the background.',
+      importance: flutter_local_notifications.Importance.low,
+      priority: flutter_local_notifications.Priority.low,
+      ongoing: true,
+      showWhen: false,
+    );
+    final details = flutter_local_notifications.NotificationDetails(android: androidDetails);
+    await _notifications.show(
+      _backgroundNotificationId,
+      'Background mode active',
+      'Mock GPS can keep running in the background.',
+      details,
+    );
+    _backgroundNotificationShown = true;
+  }
+
+  Future<void> _cancelBackgroundNotification() async {
+    if (!_backgroundNotificationShown) {
+      return;
+    }
+    await _notifications.cancel(_backgroundNotificationId);
+    _backgroundNotificationShown = false;
   }
 
   @override
@@ -320,7 +401,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                     max: 1,
                     onChanged: hasRoute
                         ? (value) {
-                            _lastTick = null;
+                            _lastTickAt = DateTime.now();
                             _setProgress(value);
                           }
                         : null,
@@ -550,8 +631,74 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     );
   }
 
+  static const FlutterBackgroundAndroidConfig _backgroundConfig = FlutterBackgroundAndroidConfig(
+    notificationTitle: 'GPS Spoofer',
+    notificationText: 'Mock location running in background',
+    notificationImportance: AndroidNotificationImportance.normal,
+    notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+  );
+
+  Future<bool> _setBackgroundMode(bool enabled) async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      _showSnack('Background mode is only supported on Android.');
+      return false;
+    }
+
+    setState(() {
+      _backgroundBusy = true;
+    });
+
+    try {
+      if (enabled) {
+        final notificationStatus = await Permission.notification.request();
+        if (!notificationStatus.isGranted) {
+          _showSnack('Notification permission is required for background mode.');
+          return false;
+        }
+
+        final initialized = await FlutterBackground.initialize(androidConfig: _backgroundConfig);
+        if (!initialized) {
+          _showSnack('Please disable battery optimizations to enable background mode.');
+          return false;
+        }
+        final hasPermissions = await FlutterBackground.hasPermissions;
+        if (!hasPermissions) {
+          _showSnack('Background permissions not granted. Disable battery optimizations and retry.');
+          return false;
+        }
+        final success = await FlutterBackground.enableBackgroundExecution();
+        if (!success) {
+          _showSnack('Failed to enable background mode.');
+          return false;
+        }
+        setState(() {
+          _backgroundEnabled = true;
+        });
+        _showSnack('Background mode enabled. Keep playback running to spoof.');
+        return true;
+      } else {
+        await FlutterBackground.disableBackgroundExecution();
+        setState(() {
+          _backgroundEnabled = false;
+        });
+        unawaited(_cancelBackgroundNotification());
+        return true;
+      }
+    } catch (error) {
+      _showSnack('Background mode error: $error');
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _backgroundBusy = false;
+        });
+      }
+    }
+  }
+
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
+    _lastMapStyleDark = null;
     unawaited(_applyMapStyle());
     if (_pendingFitRoute) {
       _fitRouteToMap();
@@ -573,7 +720,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   bool _shouldUseDarkMapStyle() {
     switch (_darkModeSetting) {
       case DarkModeSetting.on:
-        return SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+        return scheduler.SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
       case DarkModeSetting.uiOnly:
         return false;
       case DarkModeSetting.mapOnly:
@@ -730,34 +877,36 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     setState(() {
       _isPlaying = true;
     });
-    _lastTick = null;
-    _ticker ??= createTicker(_onTick);
-    _ticker!.start();
+    _lastTickAt = DateTime.now();
+    _playbackTimer?.cancel();
+    _playbackTimer = Timer.periodic(const Duration(milliseconds: 200), (_) => _onTick());
   }
 
   void _stopPlayback() {
     if (!_isPlaying) {
       return;
     }
-    _ticker?.stop();
-    _lastTick = null;
+    _playbackTimer?.cancel();
+    _playbackTimer = null;
+    _lastTickAt = null;
     setState(() {
       _isPlaying = false;
     });
   }
 
-  void _onTick(Duration elapsed) {
+  void _onTick() {
     if (!_isPlaying || _routePoints.length < 2) {
       return;
     }
 
-    if (_lastTick == null) {
-      _lastTick = elapsed;
+    final now = DateTime.now();
+    if (_lastTickAt == null) {
+      _lastTickAt = now;
       return;
     }
 
-    final deltaSeconds = (elapsed - _lastTick!).inMicroseconds / 1000000.0;
-    _lastTick = elapsed;
+    final deltaSeconds = now.difference(_lastTickAt!).inMicroseconds / 1000000.0;
+    _lastTickAt = now;
 
     final speedMps = _speedMps;
     final currentDistance = _progress * _totalDistanceMeters;
@@ -1006,6 +1155,53 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     return value ? 'OK' : 'NO';
   }
 
+  Future<bool> _ensureTosAccepted() async {
+    if (_tosAccepted) {
+      return true;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final accepted = prefs.getBool(_tosAcceptedKey) ?? false;
+    if (accepted) {
+      _tosAccepted = true;
+      return true;
+    }
+
+    if (!mounted) {
+      return false;
+    }
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: const Text('Terms of Use'),
+          content: const SingleChildScrollView(
+            child: Text(
+              'This tool is for testing and development only. You are responsible for using it legally and with permission. Location accuracy is not guaranteed, and you assume all risks from use.',
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                await prefs.setBool(_tosAcceptedKey, true);
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('I agree'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    _tosAccepted = prefs.getBool(_tosAcceptedKey) ?? false;
+    return _tosAccepted;
+  }
+
   Future<void> _runStartupChecks({required bool showDialogs}) async {
     if (_startupChecksRunning) {
       return;
@@ -1119,6 +1315,8 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     var showSetupBar = _showSetupBar;
     var showDebugPanel = _showDebugPanel;
     var showMockMarker = _showMockMarker;
+    var backgroundEnabled = _backgroundEnabled;
+    var backgroundBusy = _backgroundBusy;
     var darkModeSetting = _darkModeSetting;
     await showGeneralDialog<void>(
       context: context,
@@ -1241,19 +1439,65 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                           dense: true,
                           visualDensity: compactDensity,
                           contentPadding: EdgeInsets.zero,
+                          title: Text('Background mode', style: denseStyle),
+                          trailing: Transform.scale(
+                            scale: 0.85,
+                            child: Switch(
+                              value: backgroundEnabled,
+                              onChanged: backgroundBusy
+                              ? null
+                              : (value) async {
+                                setModalState(() {
+                                  backgroundEnabled = value;
+                                  backgroundBusy = true;
+                                });
+                                final ok = await _setBackgroundMode(value);
+                                setModalState(() {
+                                  backgroundBusy = false;
+                                  backgroundEnabled = _backgroundEnabled;
+                                });
+                                if (!ok) {
+                                  // snack handled in _setBackgroundMode
+                                }
+                              },
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                          onTap: backgroundBusy
+                          ? null
+                          : () async {
+                            final next = !backgroundEnabled;
+                            setModalState(() {
+                              backgroundEnabled = next;
+                              backgroundBusy = true;
+                            });
+                            final ok = await _setBackgroundMode(next);
+                            setModalState(() {
+                              backgroundBusy = false;
+                              backgroundEnabled = _backgroundEnabled;
+                            });
+                            if (!ok) {
+                              // snack handled in _setBackgroundMode
+                            }
+                          },
+                        ),
+                        ListTile(
+                          dense: true,
+                          visualDensity: compactDensity,
+                          contentPadding: EdgeInsets.zero,
                           title: Text('Dark mode', style: denseStyle),
                           trailing: DropdownButtonHideUnderline(
                             child: DropdownButton<DarkModeSetting>(
                               isDense: true,
                               value: darkModeSetting,
                               items: DarkModeSetting.values
-                                  .map(
-                                    (setting) => DropdownMenuItem(
-                                      value: setting,
-                                      child: Text(darkModeLabel(setting)),
-                                    ),
-                                  )
-                                  .toList(),
+                              .map(
+                                (setting) => DropdownMenuItem(
+                                  value: setting,
+                                  child: Text(darkModeLabel(setting)),
+                                ),
+                              )
+                              .toList(),
                               onChanged: (value) {
                                 if (value == null) {
                                   return;

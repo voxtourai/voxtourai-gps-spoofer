@@ -238,6 +238,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     final hasRoute = _routePoints.length >= 2;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final controlsVisible = _routePoints.length >= 2;
+    final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
@@ -309,7 +312,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     polylines: _polylines,
                     mapToolbarEnabled: false,
                     padding: EdgeInsets.only(
-                      bottom: _selectedCustomIndex != null ? 96 : 56,
+                      bottom: bottomInset + (_selectedCustomIndex != null ? 96 : 56),
                       right: 56,
                       left: 12,
                     ),
@@ -352,7 +355,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                 ),
                 Positioned(
                   right: 12,
-                  bottom: 12,
+                  bottom: overlayBottom,
                   child: FloatingActionButton.small(
                     heroTag: 'recenter',
                     onPressed: _currentPosition == null
@@ -371,7 +374,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                   Positioned(
                     left: 12,
                     right: 72,
-                    bottom: 12,
+                    bottom: overlayBottom,
                     child: Row(
                       children: [
                         Expanded(
@@ -411,12 +414,20 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               ],
             ),
           ),
-          Expanded(
-            flex: 5,
-            child: SafeArea(
-              top: false,
-              child: _buildControls(context),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            transitionBuilder: (child, animation) => SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: FadeTransition(opacity: animation, child: child),
             ),
+            child: _routePoints.length >= 2
+                ? SafeArea(
+                    key: const ValueKey('controls'),
+                    top: false,
+                    child: _buildControls(context),
+                  )
+                : const SizedBox.shrink(key: ValueKey('no-controls')),
           ),
         ],
       ),
@@ -426,6 +437,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Widget _buildControls(BuildContext context) {
     final theme = Theme.of(context);
     final bool hasRoute = _routePoints.length >= 2;
+    if (!hasRoute) {
+      return const SizedBox.shrink();
+    }
     final progressLabel = '${(_progress * 100).toStringAsFixed(0)}%';
     final distanceLabel = _totalDistanceMeters > 0
         ? '${_formatDistance(_progress * _totalDistanceMeters)} / ${_formatDistance(_totalDistanceMeters)}'

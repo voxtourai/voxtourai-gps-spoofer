@@ -151,6 +151,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final hasRoute = _routePoints.length >= 2;
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
@@ -220,7 +221,9 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
                         heroTag: 'play',
-                        onPressed: _routePoints.length >= 2 ? _togglePlayback : null,
+                        onPressed: hasRoute ? _togglePlayback : null,
+                        backgroundColor: hasRoute ? null : Theme.of(context).colorScheme.surfaceVariant,
+                        foregroundColor: hasRoute ? null : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
                         tooltip: _isPlaying ? 'Pause' : 'Play',
                         child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
                       ),

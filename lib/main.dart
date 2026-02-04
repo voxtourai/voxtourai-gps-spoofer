@@ -15,6 +15,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String _tosAcceptedKey = 'tos_accepted_v1';
+const String _savedRoutesKey = 'saved_custom_routes_v1';
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 const String _darkMapStyle = r'''
@@ -1197,6 +1198,153 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     });
   }
 
+  Future<void> _saveCustomRoute() async {
+    if (_customPoints.isEmpty) {
+      _showSnack('No custom route to save.');
+      return;
+    }
+    final suggested = 'Custom route ${DateTime.now().toLocal().toString().substring(0, 16)}';
+    final controller = TextEditingController(text: suggested);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save route'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Route name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || name == null) {
+      return;
+    }
+    final trimmed = name.isEmpty ? suggested : name;
+    await _upsertSavedRoute(trimmed);
+    _showSnack('Saved "$trimmed".');
+  }
+
+  Future<void> _upsertSavedRoute(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_savedRoutesKey);
+    final List<dynamic> routes = raw == null ? [] : (jsonDecode(raw) as List<dynamic>);
+    final entry = {
+      'name': name,
+      'points': [
+        for (final p in _customPoints)
+          {
+            'lat': p.latitude,
+            'lng': p.longitude,
+          }
+      ],
+      'names': List<String>.from(_customNames),
+    };
+    final index = routes.indexWhere((e) => e is Map && e['name'] == name);
+    if (index >= 0) {
+      routes[index] = entry;
+    } else {
+      routes.add(entry);
+    }
+    await prefs.setString(_savedRoutesKey, jsonEncode(routes));
+  }
+
+  Future<bool> _openSavedRoutes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_savedRoutesKey);
+    final List<dynamic> routes = raw == null ? [] : (jsonDecode(raw) as List<dynamic>);
+    if (routes.isEmpty) {
+      _showSnack('No saved routes yet.');
+      return false;
+    }
+    var loaded = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return ListView.separated(
+              itemCount: routes.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final item = routes[index] as Map;
+                final name = item['name']?.toString() ?? 'Route';
+                final points = (item['points'] as List?) ?? [];
+                return ListTile(
+                  title: Text(name),
+                  subtitle: Text('${points.length} points'),
+                  onTap: () {
+                    _applySavedRoute(item);
+                    loaded = true;
+                    Navigator.of(context).pop();
+                  },
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () async {
+                      routes.removeAt(index);
+                      await prefs.setString(_savedRoutesKey, jsonEncode(routes));
+                      setSheetState(() {});
+                    },
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+    return loaded;
+  }
+
+  void _applySavedRoute(Map route) {
+    final points = <LatLng>[];
+    final names = <String>[];
+    final rawPoints = route['points'];
+    if (rawPoints is List) {
+      for (final item in rawPoints) {
+        if (item is Map) {
+          final lat = item['lat'];
+          final lng = item['lng'];
+          if (lat is num && lng is num) {
+            points.add(LatLng(lat.toDouble(), lng.toDouble()));
+          }
+        }
+      }
+    }
+    final rawNames = route['names'];
+    if (rawNames is List) {
+      for (final item in rawNames) {
+        names.add(item.toString());
+      }
+    }
+    if (points.isEmpty) {
+      _showSnack('Saved route is empty.');
+      return;
+    }
+    setState(() {
+      _usingCustomRoute = true;
+      _customPoints = points;
+      _customNames = names.length == points.length
+          ? names
+          : List.generate(points.length, _defaultWaypointName);
+      _selectedCustomIndex = null;
+    });
+    _rebuildCustomRoute();
+    _fitRouteToMap();
+  }
+
   void _reorderCustomPoints(int oldIndex, int newIndex) {
     if (oldIndex < 0 || oldIndex >= _customPoints.length) {
       return;
@@ -1304,6 +1452,23 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     children: [
                       Text('Waypoints', style: Theme.of(context).textTheme.titleMedium),
                       const Spacer(),
+                      IconButton(
+                        tooltip: 'Save route',
+                        icon: const Icon(Icons.save),
+                        onPressed: () async {
+                          await _saveCustomRoute();
+                        },
+                      ),
+                      IconButton(
+                        tooltip: 'Load route',
+                        icon: const Icon(Icons.folder_open),
+                        onPressed: () async {
+                          final loaded = await _openSavedRoutes();
+                          if (loaded && context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                        },
+                      ),
                       IconButton(
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.of(context).pop(),

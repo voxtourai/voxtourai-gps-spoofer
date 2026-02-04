@@ -10,7 +10,6 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-const double _feetToMeters = 0.3048;
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 
@@ -54,7 +53,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   List<double> _cumulativeMeters = [];
   double _totalDistanceMeters = 0;
   double _progress = 0;
-  double _speedFtPerSec = 4;
+  double _speedMps = 2;
 
   LatLng? _currentPosition;
   Set<Polyline> _polylines = const {};
@@ -108,7 +107,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       body: Column(
         children: [
           Expanded(
-            flex: 3,
+            flex: 15,
             child: Stack(
               children: [
                 GoogleMap(
@@ -133,6 +132,27 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                 ),
                 Positioned(
                   right: 12,
+                  top: 12,
+                  child: Column(
+                    children: [
+                      FloatingActionButton.small(
+                        heroTag: 'load',
+                        onPressed: _routePoints.isEmpty ? _openRouteInputSheet : _clearRoute,
+                        tooltip: _routePoints.isEmpty ? 'Load route' : 'Clear route',
+                        child: Icon(_routePoints.isEmpty ? Icons.upload : Icons.close),
+                      ),
+                      const SizedBox(height: 8),
+                      FloatingActionButton.small(
+                        heroTag: 'play',
+                        onPressed: _routePoints.length >= 2 ? _togglePlayback : null,
+                        tooltip: _isPlaying ? 'Pause' : 'Play',
+                        child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  right: 12,
                   bottom: 12,
                   child: FloatingActionButton.small(
                     heroTag: 'recenter',
@@ -152,7 +172,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
             ),
           ),
           Expanded(
-            flex: 4,
+            flex: 5,
             child: SafeArea(
               top: false,
               child: _buildControls(context),
@@ -182,83 +202,12 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     );
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Route input',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
             const SizedBox(height: 4),
-            TextFormField(
-              controller: _routeController,
-              minLines: 2,
-              maxLines: 4,
-              onChanged: (_) => setState(() {}),
-              style: Theme.of(context).textTheme.bodySmall,
-              decoration: const InputDecoration(
-                hintText: 'Paste encoded polyline or Routes API JSON',
-                border: OutlineInputBorder(),
-                isDense: false,
-                contentPadding: EdgeInsets.fromLTRB(12, 12, 12, 12),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: hasRoute ? _togglePlayback : null,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 32),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            textStyle: Theme.of(context).textTheme.labelSmall,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: 18),
-                          label: Text(_isPlaying ? 'Pause' : 'Play'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: _routeController.text.trim().isEmpty ? null : _loadRouteFromInput,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 32),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            textStyle: Theme.of(context).textTheme.labelSmall,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          child: const Text('Load route'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _routeController.text.isEmpty
-                      ? null
-                      : () {
-                          _routeController.clear();
-                          setState(() {});
-                        },
-                  tooltip: 'Clear',
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Accepts encoded polyline or Google Routes API JSON.',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10),
-            ),
-            const SizedBox(height: 6),
             if (_showSetupBar)
               OutlinedButton.icon(
                 onPressed: () => _runStartupChecks(showDialogs: true),
@@ -304,7 +253,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                   children: [
                     Text('Speed', style: Theme.of(context).textTheme.labelMedium),
                     Text(
-                      '${_speedFtPerSec.toStringAsFixed(1)} ft/s',
+                      '${_speedMps.toStringAsFixed(0)} m/s',
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ],
@@ -312,12 +261,13 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                 SliderTheme(
                   data: speedSliderTheme,
                   child: Slider(
-                    value: _speedFtPerSec,
+                    value: _speedMps,
                     min: -200,
                     max: 200,
+                    divisions: 200,
                     onChanged: (value) {
                       setState(() {
-                        _speedFtPerSec = value;
+                        _speedMps = value;
                       });
                     },
                   ),
@@ -339,6 +289,72 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
         ),
       ),
     );
+  }
+
+  Future<void> _openRouteInputSheet() async {
+    final controller = TextEditingController(text: _routeController.text);
+    if (!mounted) {
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 8,
+            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Load route', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              TextField(
+                controller: controller,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  hintText: 'Paste encoded polyline or Routes API JSON',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: () {
+                  _routeController.text = controller.text;
+                  Navigator.of(context).pop();
+                  _loadRouteFromInput();
+                },
+                child: const Text('Load'),
+              ),
+              const SizedBox(height: 6),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _clearRoute() {
+    _stopPlayback();
+    setState(() {
+      _routePoints = [];
+      _cumulativeMeters = [];
+      _totalDistanceMeters = 0;
+      _progress = 0;
+      _polylines = const {};
+      _markers = const {};
+      _currentPosition = null;
+    });
   }
 
   Widget _buildDebugPanel(BuildContext context) {
@@ -587,7 +603,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     final deltaSeconds = (elapsed - _lastTick!).inMicroseconds / 1000000.0;
     _lastTick = elapsed;
 
-    final speedMps = _speedFtPerSec * _feetToMeters;
+    final speedMps = _speedMps;
     final currentDistance = _progress * _totalDistanceMeters;
     final nextDistance = currentDistance + speedMps * deltaSeconds;
 
@@ -662,7 +678,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
   }
 
   Future<void> _sendMockLocation(LatLng position) async {
-    final speedMps = _speedFtPerSec * _feetToMeters;
+    final speedMps = _speedMps.abs();
     try {
       final result = await _mockChannel.invokeMethod<Map<Object?, Object?>>('setMockLocation', {
         'latitude': position.latitude,

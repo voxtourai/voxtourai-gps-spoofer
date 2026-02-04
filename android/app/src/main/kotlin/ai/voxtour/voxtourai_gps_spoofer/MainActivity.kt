@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.content.Intent
 import android.app.AppOpsManager
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.location.FusedLocationProviderClient
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -41,6 +42,61 @@ class MainActivity : FlutterActivity() {
                         result.success(status)
                     } catch (error: Exception) {
                         result.error("MOCK_LOCATION_ERROR", error.message, null)
+                    }
+                }
+                "clearMockLocation" -> {
+                    try {
+                        val status = clearMockLocation()
+                        result.success(status)
+                    } catch (error: Exception) {
+                        result.error("MOCK_CLEAR_ERROR", error.message, null)
+                    }
+                }
+                "getLastKnownLocation" -> {
+                    try {
+                        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+                        val location = getBestLastKnownLocation(locationManager)
+                        if (location == null) {
+                            result.success(null)
+                        } else {
+                            result.success(mapOf(
+                                "latitude" to location.latitude,
+                                "longitude" to location.longitude,
+                                "accuracy" to location.accuracy
+                            ))
+                        }
+                    } catch (error: Exception) {
+                        result.error("LOCATION_ERROR", error.message, null)
+                    }
+                }
+                "getCurrentLocation" -> {
+                    try {
+                        val client = fusedClient
+                        if (client == null) {
+                            result.error("LOCATION_ERROR", "Fused client not available", null)
+                            return@setMethodCallHandler
+                        }
+                        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                            .addOnSuccessListener { location ->
+                                val resolved = location ?: run {
+                                    val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+                                    getBestLastKnownLocation(locationManager)
+                                }
+                                if (resolved == null) {
+                                    result.success(null)
+                                } else {
+                                    result.success(mapOf<String, Any>(
+                                        "latitude" to resolved.latitude,
+                                        "longitude" to resolved.longitude,
+                                        "accuracy" to resolved.accuracy
+                                    ))
+                                }
+                            }
+                            .addOnFailureListener { error ->
+                                result.error("LOCATION_ERROR", error.message, null)
+                            }
+                    } catch (error: Exception) {
+                        result.error("LOCATION_ERROR", error.message, null)
                     }
                 }
                 "getMockDebug" -> {
@@ -243,6 +299,69 @@ class MainActivity : FlutterActivity() {
         lastMockDebug = status
         return status
     }
+    private fun clearMockLocation(): Map<String, Any?> {
+        val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        val providers = listOf(LocationManager.GPS_PROVIDER)
+
+        var gpsCleared = false
+        var fusedCleared = false
+        var gpsError: String? = null
+        var fusedError: String? = null
+
+        for (provider in providers) {
+            try {
+                locationManager.removeTestProvider(provider)
+                gpsCleared = true
+            } catch (error: Exception) {
+                gpsError = error.message
+            }
+        }
+
+        try {
+            fusedClient?.let { client ->
+                if (fusedMockEnabled) {
+                    client.setMockMode(false)
+                    fusedMockEnabled = false
+                    fusedCleared = true
+                }
+            }
+        } catch (error: Exception) {
+            fusedError = error.message
+        }
+
+        testProvidersReady.clear()
+
+        val status = mapOf(
+            "gpsCleared" to gpsCleared,
+            "fusedCleared" to fusedCleared,
+            "gpsError" to gpsError,
+            "fusedError" to fusedError,
+            "mockAppSelected" to isMockLocationApp()
+        )
+        lastMockDebug = status
+        return status
+    }
+
+    private fun getBestLastKnownLocation(locationManager: LocationManager): Location? {
+        var best: Location? = null
+        val providers = locationManager.getProviders(true)
+        for (provider in providers) {
+            val location = try {
+                locationManager.getLastKnownLocation(provider)
+            } catch (_: SecurityException) {
+                null
+            }
+            if (location != null) {
+                if (best == null || location.time > best!!.time) {
+                    best = location
+                }
+            }
+        }
+        return best
+    }
+
+
+
 
     private data class ProviderSetupResult(
         val success: Boolean,

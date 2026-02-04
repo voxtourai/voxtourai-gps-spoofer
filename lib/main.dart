@@ -417,6 +417,45 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
     );
   }
 
+  Future<void> _clearMockLocation() async {
+    try {
+      final result = await _mockChannel.invokeMethod<Map<Object?, Object?>>("clearMockLocation");
+      if (mounted) {
+        setState(() {
+          _lastMockStatus = result?.map((key, value) => MapEntry(key.toString(), value));
+          _mockError = null;
+        });
+      }
+    } on PlatformException catch (error) {
+      _showSnack('Failed to clear mock location: ${error.message ?? error.code}');
+    }
+  }
+
+  Future<LatLng?> _getLocationFromChannel(String method) async {
+    try {
+      final result = await _mockChannel.invokeMethod<Map<Object?, Object?>>(method);
+      if (result == null) {
+        return null;
+      }
+      final lat = result['latitude'];
+      final lng = result['longitude'];
+      if (lat is num && lng is num) {
+        return LatLng(lat.toDouble(), lng.toDouble());
+      }
+    } on PlatformException {
+      // Ignore failures; caller can decide what to show.
+    }
+    return null;
+  }
+
+  Future<LatLng?> _getRealLocation() async {
+    final current = await _getLocationFromChannel('getCurrentLocation');
+    if (current != null) {
+      return current;
+    }
+    return _getLocationFromChannel('getLastKnownLocation');
+  }
+
   void _clearRoute() {
     _stopPlayback();
     setState(() {
@@ -427,6 +466,7 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
       _polylines = const {};
       _markers = const {};
       _currentPosition = null;
+      _lastInjectedPosition = null;
     });
   }
 
@@ -1229,6 +1269,36 @@ class _SpooferScreenState extends State<SpooferScreen> with TickerProviderStateM
                           ),
                         ),
                         const Divider(height: 16),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: compactDensity,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            textStyle: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          onPressed: () async {
+                            await _clearMockLocation();
+                            await Future.delayed(const Duration(milliseconds: 400));
+                            var location = await _getRealLocation();
+                            if (location == null) {
+                              await Future.delayed(const Duration(milliseconds: 600));
+                              location = await _getRealLocation();
+                            }
+                            if (location == null) {
+                              _showSnack('Real location not available yet.');
+                              return;
+                            }
+                            setState(() {
+                              _currentPosition = location;
+                              _lastInjectedPosition = null;
+                              _markers = const {};
+                              _autoFollow = true;
+                            });
+                            _followCamera(location);
+                          },
+                          icon: const Icon(Icons.location_off),
+                          label: const Text('Disable mock location'),
+                        ),
+                        const SizedBox(height: 6),
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
                             visualDensity: compactDensity,

@@ -146,6 +146,72 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _tosAccepted = false;
   int? _selectedCustomIndex;
   DarkModeSetting _darkModeSetting = DarkModeSetting.on;
+  final List<_HelpSection> _helpSections = const [
+    _HelpSection(
+      'Getting started',
+      [
+        'Enable Developer Options and set this app as the mock location app.',
+        'Grant location and notification permissions when prompted.',
+        'Load a route or add custom waypoints, then press Play.',
+      ],
+    ),
+    _HelpSection(
+      'Loading routes',
+      [
+        'Tap Load to paste an encoded polyline or Google Routes API JSON.',
+        'Clear removes the active route and stops playback.',
+        'When a route is loaded, Progress scrubs the route manually.',
+      ],
+    ),
+    _HelpSection(
+      'Custom routes and waypoints',
+      [
+        'Long-press the map to add waypoints when no route is loaded.',
+        'Drag a waypoint marker to move it, tap to select it.',
+        'Use Delete/Rename or the Waypoints list to manage points.',
+        'Save or load custom routes from the Waypoints list.',
+      ],
+    ),
+    _HelpSection(
+      'Playback and speed',
+      [
+        'Play starts auto movement along the route.',
+        'Speed is in m/s; negative values move in reverse.',
+        'Speed 0 pauses movement without clearing the route.',
+      ],
+    ),
+    _HelpSection(
+      'Map and camera',
+      [
+        'Recenter follows the current mock location on the map.',
+        'Drag the map to stop auto-follow.',
+        'Tap the map to set a single mock location when no route is active.',
+      ],
+    ),
+    _HelpSection(
+      'Background mode',
+      [
+        'Enable Background mode in Settings to keep spoofing when minimized.',
+        'Allow notification permission and battery optimization exemptions.',
+        'A persistent notification indicates background mode is active.',
+      ],
+    ),
+    _HelpSection(
+      'Dark mode',
+      [
+        'Use Settings to choose Off, On, UI only, or Map only.',
+        'Map style updates when the app theme changes.',
+      ],
+    ),
+    _HelpSection(
+      'Troubleshooting',
+      [
+        'If mock GPS is not applied, re-check mock app selection.',
+        'Ensure location permission is granted and mock status is green.',
+        'If other apps do not update, reopen them or check OS location settings.',
+      ],
+    ),
+  ];
 
   @override
   void initState() {
@@ -247,6 +313,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         toolbarHeight: 48,
         title: const Text('GPS Spoofer'),
         actions: [
+          IconButton(
+            tooltip: 'Help',
+            icon: const Icon(Icons.help_outline),
+            onPressed: _openHelpSheet,
+          ),
           IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings),
@@ -2189,6 +2260,88 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
+  Future<void> _openHelpSheet() async {
+    final controller = TextEditingController();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final height = MediaQuery.of(context).size.height * 0.75;
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final query = controller.text.trim().toLowerCase();
+            final sections = _helpSections.where((section) {
+              if (query.isEmpty) {
+                return true;
+              }
+              if (section.title.toLowerCase().contains(query)) {
+                return true;
+              }
+              return section.items.any((item) => item.toLowerCase().contains(query));
+            }).toList();
+            return SafeArea(
+              child: SizedBox(
+                height: height,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      child: Row(
+                        children: [
+                          Text('Help', style: Theme.of(context).textTheme.titleMedium),
+                          const Spacer(),
+                          IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: TextField(
+                        controller: controller,
+                        decoration: const InputDecoration(
+                          hintText: 'Search help...',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setSheetState(() {}),
+                      ),
+                    ),
+                    Expanded(
+                      child: sections.isEmpty
+                          ? const Center(child: Text('No matching help topics.'))
+                          : ListView.builder(
+                              itemCount: sections.length,
+                              itemBuilder: (context, index) {
+                                final section = sections[index];
+                                final body = section.items.map((item) => '- $item').join('\n');
+                                return ExpansionTile(
+                                  title: Text(section.title),
+                                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                  children: [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(body),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+  }
+
   Future<void> _openDeveloperSettings() async {
     try {
       await _mockChannel.invokeMethod('openDeveloperSettings');
@@ -2217,6 +2370,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
     return result ?? false;
   }
+}
+
+class _HelpSection {
+  final String title;
+  final List<String> items;
+
+  const _HelpSection(this.title, this.items);
 }
 
 class _UniformTrackShape extends SliderTrackShape with BaseSliderTrackShape {

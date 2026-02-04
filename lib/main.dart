@@ -375,7 +375,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     child: Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
+                          child: FilledButton.icon(
                             onPressed: () {
                               final idx = _selectedCustomIndex;
                               if (idx != null) {
@@ -384,7 +384,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             },
                             icon: const Icon(Icons.edit),
                             label: const Text('Rename'),
-                            style: OutlinedButton.styleFrom(
+                            style: FilledButton.styleFrom(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                           ),

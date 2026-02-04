@@ -129,6 +129,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Map<String, Object?>? _lastMockStatus;
   String? _selectedMockApp;
   LatLng? _lastInjectedPosition;
+  List<LatLng> _customPoints = [];
+  Set<Marker> _customMarkers = const {};
+  bool _usingCustomRoute = false;
   bool _showMockMarker = false;
   bool _showSetupBar = false;
   bool _showDebugPanel = false;
@@ -282,10 +285,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                       }
                     },
                     onTap: (position) {
-                      if (_routePoints.isNotEmpty) {
+                      if (_routePoints.isNotEmpty || _customPoints.isNotEmpty) {
                         return;
                       }
                       _setManualLocation(position);
+                    },
+                    onLongPress: (position) {
+                      if (_routePoints.isNotEmpty && !_usingCustomRoute) {
+                        _showSnack('Clear the loaded route to add points.');
+                        return;
+                      }
+                      _addCustomPoint(position);
                     },
                     markers: _markers,
                     polylines: _polylines,
@@ -551,6 +561,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _totalDistanceMeters = 0;
       _progress = 0;
       _polylines = const {};
+      _customPoints = [];
+      _customMarkers = const {};
+      _usingCustomRoute = false;
       _markers = const {};
       _currentPosition = null;
       _lastInjectedPosition = null;
@@ -774,6 +787,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         _showSnack('Failed to decode polyline.');
         return;
       }
+      _customPoints = [];
+      _customMarkers = const {};
+      _usingCustomRoute = false;
       _setRoute(points);
       _fitRouteToMap();
     } catch (error) {
@@ -945,17 +961,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _progress = clamped;
       _currentPosition = position;
       _lastInjectedPosition = position;
-      _markers = _showMockMarker
-          ? {
-              Marker(
-                markerId: const MarkerId('current'),
-                position: position,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                infoWindow: const InfoWindow(title: 'Mocked GPS'),
-                zIndex: 1,
-              ),
-            }
-          : const {};
+      _refreshMarkers();
     });
 
     unawaited(_sendMockLocation(position));
@@ -971,20 +977,108 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _currentPosition = position;
       _lastInjectedPosition = position;
       _autoFollow = true;
-      _markers = _showMockMarker
-          ? {
-              Marker(
-                markerId: const MarkerId('current'),
-                position: position,
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                infoWindow: const InfoWindow(title: 'Mocked GPS'),
-                zIndex: 1,
-              ),
-            }
-          : const {};
+      _refreshMarkers();
     });
     unawaited(_sendMockLocation(position));
     _followCamera(position);
+  }
+
+  void _refreshMarkers() {
+    final markers = <Marker>{};
+    if (_showMockMarker && _currentPosition != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('current'),
+          position: _currentPosition!,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: const InfoWindow(title: 'Mocked GPS'),
+          zIndex: 1,
+        ),
+      );
+    }
+    markers.addAll(_customMarkers);
+    _markers = markers;
+  }
+
+  void _rebuildCustomMarkers() {
+    if (_customPoints.isEmpty) {
+      _customMarkers = const {};
+      return;
+    }
+    _customMarkers = {
+      for (var i = 0; i < _customPoints.length; i++)
+        Marker(
+          markerId: MarkerId('wp_$i'),
+          position: _customPoints[i],
+          draggable: true,
+          onDragEnd: (pos) {
+            _customPoints[i] = pos;
+            _stopPlayback();
+            _rebuildCustomRoute();
+          },
+          onTap: () {
+            _removeCustomPoint(i);
+          },
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          infoWindow: InfoWindow(title: 'Waypoint ${i + 1}', snippet: 'Tap to remove · drag to move'),
+          zIndex: 0,
+        ),
+    };
+  }
+
+  void _rebuildCustomRoute() {
+    _rebuildCustomMarkers();
+    if (_customPoints.isEmpty) {
+      _routePoints = [];
+      _cumulativeMeters = [];
+      _totalDistanceMeters = 0;
+      _progress = 0;
+      _polylines = const {};
+      _currentPosition = null;
+      _lastInjectedPosition = null;
+      _refreshMarkers();
+      return;
+    }
+
+    _routePoints = List<LatLng>.from(_customPoints);
+    _cumulativeMeters = _buildCumulativeMeters(_routePoints);
+    _totalDistanceMeters = _cumulativeMeters.isEmpty ? 0 : _cumulativeMeters.last;
+    _polylines = _routePoints.length >= 2
+        ? {
+            Polyline(
+              polylineId: const PolylineId('route'),
+              color: Colors.blueAccent,
+              width: 4,
+              points: _routePoints,
+            ),
+          }
+        : const {};
+    _progress = 0;
+    _setProgress(0);
+  }
+
+  void _addCustomPoint(LatLng position) {
+    if (_routePoints.isNotEmpty && !_usingCustomRoute) {
+      _showSnack('Clear the loaded route to edit a custom route.');
+      return;
+    }
+    _usingCustomRoute = true;
+    _stopPlayback();
+    _customPoints.add(position);
+    _rebuildCustomRoute();
+    _followCamera(position);
+  }
+
+  void _removeCustomPoint(int index) {
+    if (index < 0 || index >= _customPoints.length) {
+      return;
+    }
+    _stopPlayback();
+    _customPoints.removeAt(index);
+    if (_customPoints.isEmpty) {
+      _usingCustomRoute = false;
+    }
+    _rebuildCustomRoute();
   }
 
   void _followCamera(LatLng position) {
@@ -1450,19 +1544,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             });
                             setState(() {
                               _showMockMarker = value;
-                              if (!_showMockMarker) {
-                                _markers = const {};
-                              } else if (_currentPosition != null) {
-                                _markers = {
-                                  Marker(
-                                    markerId: const MarkerId('current'),
-                                    position: _currentPosition!,
-                                    icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-                                    infoWindow: const InfoWindow(title: 'Mocked GPS'),
-                                    zIndex: 1,
-                                  ),
-                                };
-                              }
+                              _refreshMarkers();
                             });
                           },
                         ),
@@ -1565,7 +1647,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setState(() {
                               _currentPosition = location;
                               _lastInjectedPosition = null;
-                              _markers = const {};
+                              _refreshMarkers();
                               _autoFollow = true;
                             });
                             _followCamera(location);

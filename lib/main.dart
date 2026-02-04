@@ -1029,6 +1029,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
     sheetFuture.whenComplete(() {
       sheetOpen = false;
+      FocusManager.instance.primaryFocus?.unfocus();
     });
     await sheetFuture;
     controller.dispose();
@@ -2598,77 +2599,64 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _openHelpSheet() async {
-    final controller = TextEditingController();
-    await showModalBottomSheet<void>(
+    var sheetOpen = true;
+
+    void closeSheet(BuildContext context) {
+      sheetOpen = false;
+      Navigator.of(context).pop();
+    }
+
+    final sheetFuture = showModalBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
+      isScrollControlled: false,
       showDragHandle: true,
       builder: (context) {
-        final height = MediaQuery.of(context).size.height * 0.75;
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            final query = controller.text.trim().toLowerCase();
-            final sections = _helpSections.where((section) {
-              if (query.isEmpty) {
-                return true;
-              }
-              if (section.title.toLowerCase().contains(query)) {
-                return true;
-              }
-              return section.items.any((item) => item.toLowerCase().contains(query));
-            }).toList();
             return SafeArea(
-              child: SizedBox(
-                height: height,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                      child: Row(
-                        children: [
-                          Text('Help', style: Theme.of(context).textTheme.titleMedium),
-                          const Spacer(),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: TextField(
-                        controller: controller,
-                        decoration: const InputDecoration(
-                          hintText: 'Search help...',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) => setSheetState(() {}),
-                      ),
-                    ),
-                    Expanded(
-                      child: sections.isEmpty
-                          ? const Center(child: Text('No matching help topics.'))
-                          : ListView.builder(
-                              itemCount: sections.length,
-                              itemBuilder: (context, index) {
-                                final section = sections[index];
-                                final body = section.items.map((item) => '- $item').join('\n');
-                                return ExpansionTile(
-                                  title: Text(section.title),
-                                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(body),
-                                    ),
-                                  ],
-                                );
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.75,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                        child: Row(
+                          children: [
+                            Text('Help', style: Theme.of(context).textTheme.titleMedium),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                FocusScope.of(context).unfocus();
+                                closeSheet(context);
                               },
                             ),
-                    ),
-                  ],
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _helpSections.length,
+                          itemBuilder: (context, index) {
+                            final section = _helpSections[index];
+                            final body = section.items.map((item) => '- $item').join('\n');
+                            return ExpansionTile(
+                              title: Text(section.title),
+                              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(body),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -2676,7 +2664,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         );
       },
     );
-    controller.dispose();
+    sheetFuture.whenComplete(() {
+      sheetOpen = false;
+    });
+    await sheetFuture;
   }
 
   Future<void> _openDeveloperSettings() async {

@@ -130,6 +130,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   String? _selectedMockApp;
   LatLng? _lastInjectedPosition;
   List<LatLng> _customPoints = [];
+  List<String> _customNames = [];
   Set<Marker> _customMarkers = const {};
   bool _usingCustomRoute = false;
   bool _showMockMarker = false;
@@ -362,18 +363,40 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     left: 12,
                     right: 72,
                     bottom: 12,
-                    child: FilledButton.icon(
-                      onPressed: () {
-                        final idx = _selectedCustomIndex;
-                        if (idx != null) {
-                          _removeCustomPoint(idx);
-                        }
-                      },
-                      icon: const Icon(Icons.delete),
-                      label: Text('Delete waypoint ${(_selectedCustomIndex ?? 0) + 1}'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              final idx = _selectedCustomIndex;
+                              if (idx != null) {
+                                _renameCustomPoint(idx);
+                              }
+                            },
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Rename'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              final idx = _selectedCustomIndex;
+                              if (idx != null) {
+                                _removeCustomPoint(idx);
+                              }
+                            },
+                            icon: const Icon(Icons.delete),
+                            label: const Text('Delete'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -595,6 +618,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _polylines = const {};
       _customPoints = [];
       _customMarkers = const {};
+      _customNames = [];
       _usingCustomRoute = false;
       _markers = const {};
       _selectedCustomIndex = null;
@@ -822,6 +846,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
       _customPoints = [];
       _customMarkers = const {};
+      _customNames = [];
       _usingCustomRoute = false;
       _selectedCustomIndex = null;
       _setRoute(points);
@@ -1057,7 +1082,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           icon: BitmapDescriptor.defaultMarkerWithHue(
             i == _selectedCustomIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
           ),
-          infoWindow: InfoWindow(title: 'Waypoint ${i + 1}', snippet: 'Hold and drag to move'),
+          infoWindow: InfoWindow(
+            title: _customNames.length > i ? _customNames[i] : _defaultWaypointName(i),
+            snippet: 'Hold and drag to move',
+          ),
           zIndex: 2,
         ),
     };
@@ -1114,6 +1142,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     _usingCustomRoute = true;
     _stopPlayback();
+    _customNames.add(_defaultWaypointName(_customPoints.length));
     _customPoints.add(position);
     _rebuildCustomRoute();
     _followCamera(position);
@@ -1124,19 +1153,74 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     _stopPlayback();
+    _customNames.removeAt(index);
     _customPoints.removeAt(index);
     if (_customPoints.isEmpty) {
       _usingCustomRoute = false;
+      _customNames = [];
     }
     if (_selectedCustomIndex == index) {
       _selectedCustomIndex = null;
     }
+    _normalizeWaypointNames();
     _rebuildCustomRoute();
   }
 
   void _selectCustomPoint(int index) {
     setState(() {
       _selectedCustomIndex = index;
+      _rebuildCustomMarkers();
+      _refreshMarkers();
+    });
+  }
+
+  String _defaultWaypointName(int index) => 'Waypoint ${index + 1}';
+
+  void _normalizeWaypointNames() {
+    for (var i = 0; i < _customNames.length; i++) {
+      if (RegExp(r'^Waypoint\\s+\\d+$').hasMatch(_customNames[i])) {
+        _customNames[i] = _defaultWaypointName(i);
+      }
+    }
+  }
+
+  Future<void> _renameCustomPoint(int index) async {
+    if (index < 0 || index >= _customPoints.length) {
+      return;
+    }
+    final controller = TextEditingController(text: _customNames[index]);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename waypoint'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Waypoint name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    if (result == null) {
+      return;
+    }
+    final name = result.isEmpty ? _defaultWaypointName(index) : result;
+    setState(() {
+      _customNames[index] = name;
       _rebuildCustomMarkers();
       _refreshMarkers();
     });

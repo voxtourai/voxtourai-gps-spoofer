@@ -338,6 +338,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         tooltip: _isPlaying ? 'Pause' : 'Play',
                         child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
                       ),
+                      if (_usingCustomRoute && _customPoints.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        FloatingActionButton.small(
+                          heroTag: 'waypoints',
+                          onPressed: _openWaypointList,
+                          tooltip: 'Waypoints',
+                          child: const Icon(Icons.list_alt),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1174,6 +1183,39 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     });
   }
 
+  void _reorderCustomPoints(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _customPoints.length) {
+      return;
+    }
+    if (newIndex < 0 || newIndex > _customPoints.length) {
+      return;
+    }
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+    if (newIndex == oldIndex) {
+      return;
+    }
+    _stopPlayback();
+    final point = _customPoints.removeAt(oldIndex);
+    final name = _customNames.removeAt(oldIndex);
+    _customPoints.insert(newIndex, point);
+    _customNames.insert(newIndex, name);
+
+    if (_selectedCustomIndex != null) {
+      final selected = _selectedCustomIndex!;
+      if (selected == oldIndex) {
+        _selectedCustomIndex = newIndex;
+      } else if (oldIndex < selected && newIndex >= selected) {
+        _selectedCustomIndex = selected - 1;
+      } else if (oldIndex > selected && newIndex <= selected) {
+        _selectedCustomIndex = selected + 1;
+      }
+    }
+    _normalizeWaypointNames();
+    _rebuildCustomRoute();
+  }
+
   String _defaultWaypointName(int index) => 'Waypoint ${index + 1}';
 
   void _normalizeWaypointNames() {
@@ -1224,6 +1266,93 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _rebuildCustomMarkers();
       _refreshMarkers();
     });
+  }
+
+  Future<void> _openWaypointList() async {
+    if (_customPoints.isEmpty) {
+      _showSnack('No waypoints to edit.');
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final height = MediaQuery.of(context).size.height * 0.6;
+        return SafeArea(
+          child: SizedBox(
+            height: height,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Row(
+                    children: [
+                      Text('Waypoints', style: Theme.of(context).textTheme.titleMedium),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ReorderableListView.builder(
+                    itemCount: _customPoints.length,
+                    buildDefaultDragHandles: false,
+                    onReorder: (oldIndex, newIndex) {
+                      _reorderCustomPoints(oldIndex, newIndex);
+                    },
+                    itemBuilder: (context, index) {
+                      final name = _customNames.length > index
+                          ? _customNames[index]
+                          : _defaultWaypointName(index);
+                      final position = _customPoints[index];
+                      return ListTile(
+                        key: ValueKey('wp_item_$index'),
+                        dense: true,
+                        title: Text(name),
+                        subtitle: Text(
+                          '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+                        ),
+                        leading: CircleAvatar(
+                          radius: 14,
+                          child: Text('${index + 1}', style: Theme.of(context).textTheme.labelSmall),
+                        ),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          _selectCustomPoint(index);
+                        },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              tooltip: 'Rename',
+                              onPressed: () => _renameCustomPoint(index),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              tooltip: 'Delete',
+                              onPressed: () => _removeCustomPoint(index),
+                            ),
+                            ReorderableDragStartListener(
+                              index: index,
+                              child: const Icon(Icons.drag_handle),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _followCamera(LatLng position) {

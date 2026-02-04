@@ -984,7 +984,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     });
     _lastTickAt = DateTime.now();
     _playbackTimer?.cancel();
-    _playbackTimer = Timer.periodic(const Duration(milliseconds: 200), (_) => _onTick());
+    _playbackTimer = Timer.periodic(const Duration(milliseconds: 50), (_) => _onTick());
   }
 
   void _stopPlayback() {

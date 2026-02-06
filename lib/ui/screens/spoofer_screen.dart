@@ -347,7 +347,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         hasRoute: hasRoute,
                         hasPoints: _route.hasPoints,
                         isPlaying: _playback.isPlaying,
-                        showWaypoints: _waypoints.usingCustomRoute && _waypoints.hasPoints,
+                        showWaypoints: !(_route.hasRoute && !_waypoints.usingCustomRoute),
                         onLoadOrClear: _route.hasPoints ? _clearRoute : _openRouteInputSheet,
                         onTogglePlayback: hasRoute ? _togglePlayback : null,
                         onOpenWaypoints: _openWaypointList,
@@ -417,13 +417,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Widget _buildControls(BuildContext context) {
     final bool hasRoute = _route.hasRoute;
-    if (!hasRoute) {
-      return const SizedBox.shrink();
-    }
     final progressLabel = '${(_route.progress * 100).toStringAsFixed(0)}%';
     final distanceLabel = _route.totalDistanceMeters > 0
         ? '${_formatDistance(_route.progressDistance)} / ${_formatDistance(_route.totalDistanceMeters)}'
         : '0 m';
+
     return ControlsPanel(
       showSetupBar: _settings.showSetupBar,
       setupLabel: 'Setup: '
@@ -1289,10 +1287,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _openWaypointList() async {
-    if (_waypoints.points.isEmpty) {
-      _showSnack('No waypoints to edit.');
-      return;
-    }
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1301,6 +1295,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         final height = MediaQuery.of(context).size.height * 0.6;
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final hasPoints = _waypoints.points.isNotEmpty;
             return SafeArea(
               child: SizedBox(
                 height: height,
@@ -1315,9 +1310,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           IconButton(
                             tooltip: 'Save route',
                             icon: const Icon(Icons.save),
-                            onPressed: () async {
-                              await _saveCustomRoute();
-                            },
+                            onPressed: hasPoints ? _saveCustomRoute : null,
                           ),
                           IconButton(
                             tooltip: 'Load route',
@@ -1334,66 +1327,77 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                         ],
-                      ),
+                        ),
                     ),
                     Expanded(
-                      child: ReorderableListView.builder(
-                        itemCount: _waypoints.points.length,
-                        buildDefaultDragHandles: false,
-                        onReorder: (oldIndex, newIndex) {
-                          _reorderCustomPoints(oldIndex, newIndex);
-                          setSheetState(() {});
-                        },
-                        itemBuilder: (context, index) {
-                          final name = _waypoints.names.length > index
-                              ? _waypoints.names[index]
-                              : _defaultWaypointName(index);
-                          final position = _waypoints.points[index];
-                          return ListTile(
-                            key: ValueKey('wp_item_$index'),
-                            dense: true,
-                            title: Text(name),
-                            subtitle: Text(
-                              '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
-                            ),
-                            leading: CircleAvatar(
-                              radius: 14,
-                              child: Text('${index + 1}', style: Theme.of(context).textTheme.labelSmall),
-                            ),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              _selectCustomPoint(index);
-                            },
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  tooltip: 'Rename',
-                                  onPressed: () async {
-                                    await _renameCustomPoint(index);
-                                    if (context.mounted) {
-                                      setSheetState(() {});
-                                    }
+                      child: hasPoints
+                          ? ReorderableListView.builder(
+                              itemCount: _waypoints.points.length,
+                              buildDefaultDragHandles: false,
+                              onReorder: (oldIndex, newIndex) {
+                                _reorderCustomPoints(oldIndex, newIndex);
+                                setSheetState(() {});
+                              },
+                              itemBuilder: (context, index) {
+                                final name = _waypoints.names.length > index
+                                    ? _waypoints.names[index]
+                                    : _defaultWaypointName(index);
+                                final position = _waypoints.points[index];
+                                return ListTile(
+                                  key: ValueKey('wp_item_$index'),
+                                  dense: true,
+                                  title: Text(name),
+                                  subtitle: Text(
+                                    '${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
+                                  ),
+                                  leading: CircleAvatar(
+                                    radius: 14,
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: Theme.of(context).textTheme.labelSmall,
+                                    ),
+                                  ),
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    _selectCustomPoint(index);
                                   },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  tooltip: 'Delete',
-                                  onPressed: () {
-                                    _removeCustomPoint(index);
-                                    setSheetState(() {});
-                                  },
-                                ),
-                                ReorderableDragStartListener(
-                                  index: index,
-                                  child: const Icon(Icons.drag_handle),
-                                ),
-                              ],
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        tooltip: 'Rename',
+                                        onPressed: () async {
+                                          await _renameCustomPoint(index);
+                                          if (context.mounted) {
+                                            setSheetState(() {});
+                                          }
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        tooltip: 'Delete',
+                                        onPressed: () {
+                                          _removeCustomPoint(index);
+                                          setSheetState(() {});
+                                        },
+                                      ),
+                                      ReorderableDragStartListener(
+                                        index: index,
+                                        child: const Icon(Icons.drag_handle),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            )
+                          : Center(
+                              child: Text(
+                                'No waypoints yet. Tap and hold on the map to add points.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                                textAlign: TextAlign.center,
+                              ),
                             ),
-                          );
-                        },
-                      ),
                     ),
                   ],
                 ),

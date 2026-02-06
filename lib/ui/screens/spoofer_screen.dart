@@ -24,8 +24,8 @@ import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../controllers/ui_message_controller.dart';
 import '../../controllers/waypoint_controller.dart';
-import '../../models/help_section.dart';
 import '../map/map_style.dart';
+import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
 import '../widgets/map_action_buttons.dart';
 import '../widgets/waypoint_action_row.dart';
@@ -75,73 +75,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _packageInfoLoading = false;
   int _titleTapCount = 0;
   DateTime? _lastTitleTapAt;
-  final List<HelpSection> _helpSections = const [
-    HelpSection(
-      'Getting started',
-      [
-        'Enable Developer Options and set this app as the mock location app.',
-        'Grant location and notification permissions when prompted.',
-        'Load a route or add custom waypoints, then press Play.',
-      ],
-    ),
-    HelpSection(
-      'Loading routes',
-      [
-        'Tap Load to paste an encoded polyline or Google Routes API JSON.',
-        'Clear removes the active route and stops playback.',
-        'When a route is loaded, Progress scrubs the route manually.',
-      ],
-    ),
-    HelpSection(
-      'Custom routes and waypoints',
-      [
-        'Long-press the map to add waypoints when no route is loaded.',
-        'Drag a waypoint marker to move it, tap to select it.',
-        'Use Delete/Rename or the Waypoints list to manage points.',
-        'Save or load custom routes from the Waypoints list.',
-      ],
-    ),
-    HelpSection(
-      'Playback and speed',
-      [
-        'Play starts auto movement along the route.',
-        'Speed is in m/s; negative values move in reverse.',
-        'Speed 0 pauses movement without clearing the route.',
-      ],
-    ),
-    HelpSection(
-      'Map and camera',
-      [
-        'Recenter follows the current mock location on the map.',
-        'Drag the map to stop auto-follow.',
-        'Tap the map to set a single mock location when no route is active.',
-      ],
-    ),
-    HelpSection(
-      'Background mode',
-      [
-        'Enable Background mode in Settings to keep spoofing when minimized.',
-        'Allow notification permission and battery optimization exemptions.',
-        'A persistent notification indicates background mode is active.',
-      ],
-    ),
-    HelpSection(
-      'Dark mode',
-      [
-        'Use Settings to choose Off, On, UI only, or Map only.',
-        'Map style updates when the app theme changes.',
-      ],
-    ),
-    HelpSection(
-      'Troubleshooting',
-      [
-        'If mock GPS is not applied, re-check mock app selection.',
-        'Ensure location permission is granted and mock status is green.',
-        'If other apps do not update, reopen them or check OS location settings.',
-      ],
-    ),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -2013,7 +1946,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (context) => HelpScreen(helpSections: _helpSections),
+        builder: (context) => HelpScreen(helpSections: helpSections),
       ),
     );
   }

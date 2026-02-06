@@ -18,6 +18,7 @@ import '../../controllers/mock_location_controller.dart';
 import '../../controllers/playback_controller.dart';
 import '../../controllers/route_controller.dart';
 import '../../controllers/theme_controller.dart';
+import '../../controllers/waypoint_controller.dart';
 import '../../models/help_section.dart';
 import '../map/map_style.dart';
 import '../widgets/uniform_slider.dart';
@@ -70,10 +71,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Map<String, Object?>? _lastMockStatus;
   String? _selectedMockApp;
   LatLng? _lastInjectedPosition;
-  List<LatLng> _customPoints = [];
-  List<String> _customNames = [];
+  final WaypointController _waypoints = WaypointController();
   Set<Marker> _customMarkers = const {};
-  bool _usingCustomRoute = false;
   bool _showMockMarker = false;
   bool _showSetupBar = false;
   bool _showDebugPanel = false;
@@ -87,7 +86,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
   bool _tosAccepted = false;
-  int? _selectedCustomIndex;
   DarkModeSetting _darkModeSetting = DarkModeSetting.on;
   PackageInfo? _packageInfo;
   bool _packageInfoLoading = false;
@@ -318,19 +316,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                       }
                     },
                     onTap: (position) {
-                      if (_selectedCustomIndex != null) {
+                      if (_waypoints.selectedIndex != null) {
                         setState(() {
-                          _selectedCustomIndex = null;
+                          _waypoints.selectedIndex = null;
                         });
                         return;
                       }
-                      if (_route.hasPoints || _customPoints.isNotEmpty) {
+                      if (_route.hasPoints || _waypoints.hasPoints) {
                         return;
                       }
                       _setManualLocation(position);
                     },
                     onLongPress: (position) {
-                      if (_route.hasPoints && !_usingCustomRoute) {
+                      if (_route.hasPoints && !_waypoints.usingCustomRoute) {
                         _showSnack('Clear the loaded route to add points.');
                         return;
                       }
@@ -369,7 +367,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         tooltip: _playback.isPlaying ? 'Pause' : 'Play',
                         child: Icon(_playback.isPlaying ? Icons.pause : Icons.play_arrow),
                       ),
-                      if (_usingCustomRoute && _customPoints.isNotEmpty) ...[
+                      if (_waypoints.usingCustomRoute && _waypoints.hasPoints) ...[
                         const SizedBox(height: 8),
                         FloatingActionButton.small(
                           heroTag: 'waypoints',
@@ -398,7 +396,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     child: Icon(_autoFollow ? Icons.my_location : Icons.center_focus_strong),
                   ),
                 ),
-                if (_selectedCustomIndex != null)
+                if (_waypoints.selectedIndex != null)
                   Positioned(
                     left: 12,
                     right: 72,
@@ -408,7 +406,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         Expanded(
                           child: FilledButton.icon(
                             onPressed: () {
-                              final idx = _selectedCustomIndex;
+                              final idx = _waypoints.selectedIndex;
                               if (idx != null) {
                                 _renameCustomPoint(idx);
                               }
@@ -424,7 +422,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         Expanded(
                           child: FilledButton.icon(
                             onPressed: () {
-                              final idx = _selectedCustomIndex;
+                              final idx = _waypoints.selectedIndex;
                               if (idx != null) {
                                 _removeCustomPoint(idx);
                               }
@@ -645,12 +643,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     setState(() {
       _route.clear();
       _polylines = const {};
-      _customPoints = [];
+      _waypoints.clear();
       _customMarkers = const {};
-      _customNames = [];
-      _usingCustomRoute = false;
       _markers = const {};
-      _selectedCustomIndex = null;
       _currentPosition = null;
       _lastInjectedPosition = null;
     });
@@ -1006,11 +1001,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         _showSnack('Failed to decode polyline.');
         return;
       }
-      _customPoints = [];
+      _waypoints.clear();
       _customMarkers = const {};
-      _customNames = [];
-      _usingCustomRoute = false;
-      _selectedCustomIndex = null;
       _setRoute(points);
       _fitRouteToMap();
     } catch (error) {
@@ -1175,7 +1167,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _setManualLocation(LatLng position, {bool force = false, double? zoom}) {
-    if (_route.hasPoints || _customPoints.isNotEmpty) {
+    if (_route.hasPoints || _waypoints.hasPoints) {
       if (!force) {
         return;
       }
@@ -1216,18 +1208,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _rebuildCustomMarkers() {
-    if (_customPoints.isEmpty) {
+    if (_waypoints.points.isEmpty) {
       _customMarkers = const {};
       return;
     }
     _customMarkers = {
-      for (var i = 0; i < _customPoints.length; i++)
+      for (var i = 0; i < _waypoints.points.length; i++)
         Marker(
           markerId: MarkerId('wp_$i'),
-          position: _customPoints[i],
+          position: _waypoints.points[i],
           draggable: true,
           onDragEnd: (pos) {
-            _customPoints[i] = pos;
+            _waypoints.points[i] = pos;
             _stopPlayback();
             _rebuildCustomRoute();
             _selectCustomPoint(i);
@@ -1236,10 +1228,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             _selectCustomPoint(i);
           },
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            i == _selectedCustomIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+            i == _waypoints.selectedIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
           ),
           infoWindow: InfoWindow(
-            title: _customNames.length > i ? _customNames[i] : _defaultWaypointName(i),
+            title: _waypoints.names.length > i ? _waypoints.names[i] : _defaultWaypointName(i),
             snippet: 'Hold and drag to move',
           ),
           zIndex: 2,
@@ -1249,7 +1241,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _rebuildCustomRoute() {
     _rebuildCustomMarkers();
-    if (_customPoints.isEmpty) {
+    if (_waypoints.points.isEmpty) {
       if (mounted) {
         setState(() {
           _route.clear();
@@ -1268,7 +1260,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
 
-    _route.setRoute(List<LatLng>.from(_customPoints));
+    _route.setRoute(List<LatLng>.from(_waypoints.points));
     _polylines = _route.hasRoute
         ? {
             Polyline(
@@ -1283,31 +1275,31 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _addCustomPoint(LatLng position) {
-    if (_route.hasPoints && !_usingCustomRoute) {
+    if (_route.hasPoints && !_waypoints.usingCustomRoute) {
       _showSnack('Clear the loaded route to edit a custom route.');
       return;
     }
-    _usingCustomRoute = true;
+    _waypoints.usingCustomRoute = true;
     _stopPlayback();
-    _customNames.add(_defaultWaypointName(_customPoints.length));
-    _customPoints.add(position);
+    _waypoints.names.add(_defaultWaypointName(_waypoints.points.length));
+    _waypoints.points.add(position);
     _rebuildCustomRoute();
     _followCamera(position);
   }
 
   void _removeCustomPoint(int index) {
-    if (index < 0 || index >= _customPoints.length) {
+    if (index < 0 || index >= _waypoints.points.length) {
       return;
     }
     _stopPlayback();
-    _customNames.removeAt(index);
-    _customPoints.removeAt(index);
-    if (_customPoints.isEmpty) {
-      _usingCustomRoute = false;
-      _customNames = [];
+    _waypoints.names.removeAt(index);
+    _waypoints.points.removeAt(index);
+    if (_waypoints.points.isEmpty) {
+      _waypoints.usingCustomRoute = false;
+      _waypoints.names.clear();
     }
-    if (_selectedCustomIndex == index) {
-      _selectedCustomIndex = null;
+    if (_waypoints.selectedIndex == index) {
+      _waypoints.selectedIndex = null;
     }
     _normalizeWaypointNames();
     _rebuildCustomRoute();
@@ -1315,14 +1307,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _selectCustomPoint(int index) {
     setState(() {
-      _selectedCustomIndex = index;
+      _waypoints.selectedIndex = index;
       _rebuildCustomMarkers();
       _refreshMarkers();
     });
   }
 
   Future<void> _saveCustomRoute() async {
-    if (_customPoints.isEmpty) {
+    if (_waypoints.points.isEmpty) {
       _showSnack('No custom route to save.');
       return;
     }
@@ -1366,13 +1358,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final entry = {
       'name': name,
       'points': [
-        for (final p in _customPoints)
+        for (final p in _waypoints.points)
           {
             'lat': p.latitude,
             'lng': p.longitude,
           }
       ],
-      'names': List<String>.from(_customNames),
+      'names': List<String>.from(_waypoints.names),
     };
     final index = routes.indexWhere((e) => e is Map && e['name'] == name);
     if (index >= 0) {
@@ -1457,22 +1449,26 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     setState(() {
-      _usingCustomRoute = true;
-      _customPoints = points;
-      _customNames = names.length == points.length
-          ? names
-          : List.generate(points.length, _defaultWaypointName);
-      _selectedCustomIndex = null;
+      _waypoints.usingCustomRoute = true;
+      _waypoints.points
+        ..clear()
+        ..addAll(points);
+      _waypoints.names
+        ..clear()
+        ..addAll(
+          names.length == points.length ? names : List.generate(points.length, _defaultWaypointName),
+        );
+      _waypoints.selectedIndex = null;
     });
     _rebuildCustomRoute();
     _fitRouteToMap();
   }
 
   void _reorderCustomPoints(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _customPoints.length) {
+    if (oldIndex < 0 || oldIndex >= _waypoints.points.length) {
       return;
     }
-    if (newIndex < 0 || newIndex > _customPoints.length) {
+    if (newIndex < 0 || newIndex > _waypoints.points.length) {
       return;
     }
     if (newIndex > oldIndex) {
@@ -1482,19 +1478,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     _stopPlayback();
-    final point = _customPoints.removeAt(oldIndex);
-    final name = _customNames.removeAt(oldIndex);
-    _customPoints.insert(newIndex, point);
-    _customNames.insert(newIndex, name);
+    final point = _waypoints.points.removeAt(oldIndex);
+    final name = _waypoints.names.removeAt(oldIndex);
+    _waypoints.points.insert(newIndex, point);
+    _waypoints.names.insert(newIndex, name);
 
-    if (_selectedCustomIndex != null) {
-      final selected = _selectedCustomIndex!;
+    if (_waypoints.selectedIndex != null) {
+      final selected = _waypoints.selectedIndex!;
       if (selected == oldIndex) {
-        _selectedCustomIndex = newIndex;
+        _waypoints.selectedIndex = newIndex;
       } else if (oldIndex < selected && newIndex >= selected) {
-        _selectedCustomIndex = selected - 1;
+        _waypoints.selectedIndex = selected - 1;
       } else if (oldIndex > selected && newIndex <= selected) {
-        _selectedCustomIndex = selected + 1;
+        _waypoints.selectedIndex = selected + 1;
       }
     }
     _normalizeWaypointNames();
@@ -1504,18 +1500,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   String _defaultWaypointName(int index) => 'Waypoint ${index + 1}';
 
   void _normalizeWaypointNames() {
-    for (var i = 0; i < _customNames.length; i++) {
-      if (RegExp(r'^Waypoint\\s+\\d+$').hasMatch(_customNames[i])) {
-        _customNames[i] = _defaultWaypointName(i);
+    for (var i = 0; i < _waypoints.names.length; i++) {
+      if (RegExp(r'^Waypoint\\s+\\d+$').hasMatch(_waypoints.names[i])) {
+        _waypoints.names[i] = _defaultWaypointName(i);
       }
     }
   }
 
   Future<void> _renameCustomPoint(int index) async {
-    if (index < 0 || index >= _customPoints.length) {
+    if (index < 0 || index >= _waypoints.points.length) {
       return;
     }
-    final currentName = _customNames[index];
+    final currentName = _waypoints.names[index];
     final controller = TextEditingController();
     final focusNode = FocusNode();
     var canSave = false;
@@ -1570,14 +1566,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     setState(() {
-      _customNames[index] = result;
+      _waypoints.names[index] = result;
       _rebuildCustomMarkers();
       _refreshMarkers();
     });
   }
 
   Future<void> _openWaypointList() async {
-    if (_customPoints.isEmpty) {
+    if (_waypoints.points.isEmpty) {
       _showSnack('No waypoints to edit.');
       return;
     }
@@ -1626,17 +1622,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     ),
                     Expanded(
                       child: ReorderableListView.builder(
-                        itemCount: _customPoints.length,
+                        itemCount: _waypoints.points.length,
                         buildDefaultDragHandles: false,
                         onReorder: (oldIndex, newIndex) {
                           _reorderCustomPoints(oldIndex, newIndex);
                           setSheetState(() {});
                         },
                         itemBuilder: (context, index) {
-                          final name = _customNames.length > index
-                              ? _customNames[index]
+                          final name = _waypoints.names.length > index
+                              ? _waypoints.names[index]
                               : _defaultWaypointName(index);
-                          final position = _customPoints[index];
+                          final position = _waypoints.points[index];
                           return ListTile(
                             key: ValueKey('wp_item_$index'),
                             dense: true,

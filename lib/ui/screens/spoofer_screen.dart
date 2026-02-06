@@ -853,6 +853,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
       _setRoute(points);
       _fitRouteToMap();
+    } on RangeError {
+      _messages.showSnack('Invalid polyline: input is incomplete or malformed.');
     } catch (error) {
       _messages.showSnack('Failed to load route: $error');
     }

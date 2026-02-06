@@ -15,12 +15,14 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/map_state_controller.dart';
+import '../../controllers/mock_status_controller.dart';
 import '../../controllers/playback_controller.dart';
 import '../../controllers/preferences_controller.dart';
 import '../../controllers/route_controller.dart';
 import '../../controllers/route_workflow_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
+import '../../controllers/ui_message_controller.dart';
 import '../../controllers/waypoint_controller.dart';
 import '../../models/help_section.dart';
 import '../map/map_style.dart';
@@ -60,19 +62,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final PlaybackController _playback = PlaybackController();
   final SettingsController _settings = SettingsController();
   final PreferencesController _prefs = PreferencesController();
-  String? _mockError;
-  DateTime? _lastMockErrorAt;
-  bool? _hasLocationPermission;
-  bool? _isDeveloperModeEnabled;
-  bool? _isMockLocationApp;
+  final MockStatusController _status = MockStatusController();
+  final UiMessageController _messages = UiMessageController();
   bool _startupChecksRunning = false;
-  Map<String, Object?>? _lastMockStatus;
-  String? _selectedMockApp;
-  bool _backgroundNotificationShown = false;
-  final List<String> _debugLog = [];
-  String? _lastDebugMessage;
-  DateTime? _lastDebugAt;
   OverlayEntry? _overlayMessage;
+  int _lastMessageId = -1;
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
@@ -153,6 +147,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initNotifications());
+    _messages.addListener(_handleUiMessage);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final accepted = await _ensureTosAccepted();
       if (accepted) {
@@ -170,6 +165,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _mapState.dispose();
     _routeState.dispose();
     _settings.dispose();
+    _status.dispose();
+    _messages.removeListener(_handleUiMessage);
+    _messages.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
@@ -206,7 +204,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _showBackgroundNotification() async {
-    if (_backgroundNotificationShown) {
+    if (_settings.backgroundNotificationShown) {
       return;
     }
     final androidDetails = flutter_local_notifications.AndroidNotificationDetails(
@@ -225,15 +223,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       'Mock GPS can keep running in the background.',
       details,
     );
-    _backgroundNotificationShown = true;
+    _settings.setBackgroundNotificationShown(true);
   }
 
   Future<void> _cancelBackgroundNotification() async {
-    if (!_backgroundNotificationShown) {
+    if (!_settings.backgroundNotificationShown) {
       return;
     }
     await _notifications.cancel(_backgroundNotificationId);
-    _backgroundNotificationShown = false;
+    _settings.setBackgroundNotificationShown(false);
   }
 
   @override
@@ -245,7 +243,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_routeState, _playback, _settings, _mapState]),
+      animation: Listenable.merge([_routeState, _playback, _settings, _mapState, _status]),
       builder: (context, _) {
         final hasRoute = _route.hasRoute;
         final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -290,8 +288,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           _mapState.setAutoFollow(false);
                         }
                       },
-                      child: GoogleMap(
-                        key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
+                        child: GoogleMap(
+                        key: ValueKey(
+                          'map-${_status.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
+                        ),
                         initialCameraPosition: CameraPosition(
                           target: _mapState.currentPosition ?? const LatLng(0, 0),
                           zoom: _mapState.currentPosition == null ? 2 : 16,
@@ -322,7 +322,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         },
                         onLongPress: (position) {
                           if (_route.hasPoints && !_waypoints.usingCustomRoute) {
-                            _showSnack('Clear the loaded route to add points.');
+                            _messages.showSnack('Clear the loaded route to add points.');
                             return;
                           }
                           _addCustomPoint(position);
@@ -335,7 +335,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           right: 56,
                           left: 12,
                         ),
-                        myLocationEnabled: _hasLocationPermission == true,
+                        myLocationEnabled: _status.hasLocationPermission == true,
                         myLocationButtonEnabled: false,
                         zoomControlsEnabled: false,
                       ),
@@ -425,9 +425,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     return ControlsPanel(
       showSetupBar: _settings.showSetupBar,
       setupLabel: 'Setup: '
-          'location ${_statusLabel(_hasLocationPermission)} · '
-          'dev ${_statusLabel(_isDeveloperModeEnabled)} · '
-          'mock ${_statusLabel(_isMockLocationApp)}',
+          'location ${_statusLabel(_status.hasLocationPermission)} · '
+          'dev ${_statusLabel(_status.isDeveloperModeEnabled)} · '
+          'mock ${_statusLabel(_status.isMockLocationApp)}',
       onRunSetupChecks: () => _runStartupChecks(showDialogs: true),
       progressLabel: progressLabel,
       distanceLabel: distanceLabel,
@@ -440,7 +440,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           : null,
       speedMps: _playback.speedMps,
       onSpeedChanged: (value) => _playback.speedMps = value,
-      mockError: _mockError,
+      mockError: _status.mockError,
     );
   }
 
@@ -488,7 +488,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                 controller.selection = TextSelection.collapsed(
                   offset: controller.text.length,
                 );
-                _showOverlayMessage('Filled demo route.');
+                _messages.showOverlay('Filled demo route.');
               },
               child: const Text('Demo'),
             ),
@@ -509,15 +509,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<void> _clearMockLocation() async {
     try {
       final result = await widget.mockController.clearMockLocation();
-      if (mounted) {
-        setState(() {
-          _lastMockStatus = result;
-          _mockError = null;
-        });
-      }
+      _status.setLastMockStatus(result);
+      _status.clearMockError();
       _appendDebugLog('Cleared mock location.');
     } on PlatformException catch (error) {
-      _showSnack('Failed to clear mock location: ${error.message ?? error.code}');
+      _messages.showSnack('Failed to clear mock location: ${error.message ?? error.code}');
       _appendDebugLog('Clear mock failed: ${error.message ?? error.code}');
     }
   }
@@ -536,30 +532,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _appendDebugLog(String message) {
-    final now = DateTime.now();
-    if (_lastDebugMessage == message &&
-        _lastDebugAt != null &&
-        now.difference(_lastDebugAt!) < const Duration(seconds: 3)) {
-      return;
-    }
-    _lastDebugMessage = message;
-    _lastDebugAt = now;
-    final stamp =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-    final entry = '[$stamp] $message';
-    if (!mounted) {
-      _debugLog.add(entry);
-      if (_debugLog.length > 50) {
-        _debugLog.removeRange(0, _debugLog.length - 50);
-      }
-      return;
-    }
-    setState(() {
-      _debugLog.add(entry);
-      if (_debugLog.length > 50) {
-        _debugLog.removeRange(0, _debugLog.length - 50);
-      }
-    });
+    _status.appendDebugLog(message);
   }
 
   void _handleTitleTap() {
@@ -653,7 +626,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Widget _buildDebugPanel(BuildContext context) {
-    final status = _lastMockStatus;
+    final status = _status.lastMockStatus;
     final theme = Theme.of(context);
     if (!_settings.showDebugPanel) {
       return const SizedBox.shrink();
@@ -674,11 +647,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             style: theme.textTheme.bodySmall,
           ),
           Text(
-            'Mock app selected: ${_isMockLocationApp == null ? '—' : _isMockLocationApp == true ? 'YES' : 'NO'}',
+            'Mock app selected: ${_status.isMockLocationApp == null ? '—' : _status.isMockLocationApp == true ? 'YES' : 'NO'}',
             style: theme.textTheme.bodySmall,
           ),
           Text(
-            'Selected package: ${_selectedMockApp ?? '—'}',
+            'Selected package: ${_status.selectedMockApp ?? '—'}',
             style: theme.textTheme.bodySmall,
           ),
           Text(
@@ -731,10 +704,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               borderRadius: BorderRadius.circular(6),
             ),
             constraints: const BoxConstraints(maxHeight: 220),
-            child: _debugLog.isEmpty
+            child: _status.debugLog.isEmpty
                 ? Text('No debug events yet.', style: theme.textTheme.bodySmall)
                 : SingleChildScrollView(
-                    child: Text(_debugLog.join('\n'), style: theme.textTheme.bodySmall),
+                    child: Text(_status.debugLog.join('\n'), style: theme.textTheme.bodySmall),
                   ),
           ),
           const SizedBox(height: 4),
@@ -760,7 +733,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<bool> _setBackgroundMode(bool enabled) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
-      _showSnack('Background mode is only supported on Android.');
+      _messages.showSnack('Background mode is only supported on Android.');
       return false;
     }
 
@@ -770,27 +743,29 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       if (enabled) {
         final notificationStatus = await Permission.notification.request();
         if (!notificationStatus.isGranted) {
-          _showSnack('Notification permission is required for background mode.');
+          _messages.showSnack('Notification permission is required for background mode.');
           return false;
         }
 
         final initialized = await FlutterBackground.initialize(androidConfig: _backgroundConfig);
         if (!initialized) {
-          _showSnack('Please disable battery optimizations to enable background mode.');
+          _messages.showSnack('Please disable battery optimizations to enable background mode.');
           return false;
         }
         final hasPermissions = await FlutterBackground.hasPermissions;
         if (!hasPermissions) {
-          _showSnack('Background permissions not granted. Disable battery optimizations and retry.');
+          _messages.showSnack(
+            'Background permissions not granted. Disable battery optimizations and retry.',
+          );
           return false;
         }
         final success = await FlutterBackground.enableBackgroundExecution();
         if (!success) {
-          _showSnack('Failed to enable background mode.');
+          _messages.showSnack('Failed to enable background mode.');
           return false;
         }
         _settings.setBackgroundEnabled(true);
-        _showSnack('Background mode enabled. Keep playback running to spoof.');
+        _messages.showSnack('Background mode enabled. Keep playback running to spoof.');
         return true;
       } else {
         await FlutterBackground.disableBackgroundExecution();
@@ -799,7 +774,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         return true;
       }
     } catch (error) {
-      _showSnack('Background mode error: $error');
+      _messages.showSnack('Background mode error: $error');
       return false;
     } finally {
       _settings.setBackgroundBusy(false);
@@ -860,7 +835,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<void> _loadRouteFromInput() async {
     final input = _routeController.text.trim();
     if (input.isEmpty) {
-      _showSnack('Paste an encoded polyline or Routes API JSON.');
+      _messages.showSnack('Paste an encoded polyline or Routes API JSON.');
       return;
     }
 
@@ -868,20 +843,20 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
     final polyline = _extractPolylineFromInput(input);
     if (polyline == null || polyline.isEmpty) {
-      _showSnack('No encoded polyline found in input.');
+      _messages.showSnack('No encoded polyline found in input.');
       return;
     }
 
     try {
       final points = _route.decodePolyline(polyline);
       if (points.length < 2) {
-        _showSnack('Failed to decode polyline.');
+        _messages.showSnack('Failed to decode polyline.');
         return;
       }
       _setRoute(points);
       _fitRouteToMap();
     } catch (error) {
-      _showSnack('Failed to load route: $error');
+      _messages.showSnack('Failed to load route: $error');
     }
   }
 
@@ -1070,7 +1045,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _addCustomPoint(LatLng position) {
     if (_route.hasPoints && !_waypoints.usingCustomRoute) {
-      _showSnack('Clear the loaded route to edit a custom route.');
+      _messages.showSnack('Clear the loaded route to edit a custom route.');
       return;
     }
     _routeState.addWaypoint(position);
@@ -1093,7 +1068,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _saveCustomRoute() async {
     if (_waypoints.points.isEmpty) {
-      _showSnack('No custom route to save.');
+      _messages.showSnack('No custom route to save.');
       return;
     }
     final suggested = 'Custom route ${DateTime.now().toLocal().toString().substring(0, 16)}';
@@ -1126,7 +1101,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     final trimmed = name.isEmpty ? suggested : name;
     await _upsertSavedRoute(trimmed);
-    _showSnack('Saved "$trimmed".');
+    _messages.showSnack('Saved "$trimmed".');
   }
 
   Future<void> _upsertSavedRoute(String name) async {
@@ -1140,7 +1115,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<bool> _openSavedRoutes() async {
     final routes = await _prefs.loadSavedRoutes();
     if (routes.isEmpty) {
-      _showSnack('No saved routes yet.');
+      _messages.showSnack('No saved routes yet.');
       return false;
     }
     var loaded = false;
@@ -1205,7 +1180,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
     }
     if (points.isEmpty) {
-      _showSnack('Saved route is empty.');
+      _messages.showSnack('Saved route is empty.');
       return;
     }
     _routeState.setWaypointsFromSaved(points, names);
@@ -1438,7 +1413,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _sendMockLocation(LatLng position) async {
     final speedMps = _playback.speedMps.abs();
-    final hadError = _mockError != null;
+    final hadError = _status.mockError != null;
     try {
       final result = await widget.mockController.setMockLocation(
         latitude: position.latitude,
@@ -1446,11 +1421,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         accuracy: 3.0,
         speedMps: speedMps,
       );
-      if (mounted) {
-        setState(() {
-          _lastMockStatus = result;
-        });
-      }
+      _status.setLastMockStatus(result);
       final gpsApplied = result?['gpsApplied'] == true;
       final mockAppSelected = result?['mockAppSelected'] == true;
       final gpsError = result?['gpsError']?.toString();
@@ -1460,29 +1431,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         final details = gpsError ?? fusedError ?? 'GPS mock not applied';
         final hint = mockAppSelected ? 'Mock app set, but GPS mock failed.' : 'Select this app as mock location.';
         final message = 'Mock GPS not applied: $details. $hint';
-        if (mounted) {
-          setState(() {
-            _mockError = message;
-          });
-        }
+        _status.setMockError(message);
         _appendDebugLog('Mock apply failed: $details');
-      } else if (_mockError != null && mounted) {
-        setState(() {
-          _mockError = null;
-        });
+      } else if (_status.mockError != null) {
+        _status.clearMockError();
         if (hadError) {
           _appendDebugLog('Mock apply ok.');
         }
       }
     } on PlatformException catch (error) {
-      final now = DateTime.now();
-      if (_lastMockErrorAt == null || now.difference(_lastMockErrorAt!) > const Duration(seconds: 5)) {
-        _lastMockErrorAt = now;
-        if (mounted) {
-          setState(() {
-            _mockError = 'Mock location failed: ${error.message ?? error.code}';
-          });
-        }
+      if (_status.shouldReportMockError(const Duration(seconds: 5))) {
+        _status.setMockError('Mock location failed: ${error.message ?? error.code}');
         _appendDebugLog('Mock exception: ${error.message ?? error.code}');
       }
     }
@@ -1588,6 +1547,22 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     });
   }
 
+  void _handleUiMessage() {
+    final message = _messages.message;
+    if (message == null || message.id == _lastMessageId || !mounted) {
+      return;
+    }
+    _lastMessageId = message.id;
+    switch (message.type) {
+      case UiMessageType.snack:
+        _showSnack(message.message);
+        break;
+      case UiMessageType.overlay:
+        _showOverlayMessage(message.message);
+        break;
+    }
+  }
+
   String _statusLabel(bool? value) {
     if (value == null) {
       return '…';
@@ -1653,9 +1628,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
 
       final devEnabled = await _isDeveloperModeEnabledNative();
-      setState(() {
-        _isDeveloperModeEnabled = devEnabled;
-      });
+      _status.setDeveloperModeEnabled(devEnabled);
       if (!devEnabled) {
         if (showDialogs) {
           final open = await _confirmDialog(
@@ -1671,9 +1644,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
 
       final isMockApp = await _isMockLocationAppNative();
-      setState(() {
-        _isMockLocationApp = isMockApp;
-      });
+      _status.setMockLocationApp(isMockApp);
       if (!isMockApp && showDialogs) {
         final open = await _confirmDialog(
           'Select Mock Location App',
@@ -1692,9 +1663,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<bool> _requestLocationPermission({required bool showDialogs}) async {
     final status = await Permission.locationWhenInUse.request();
     final granted = status.isGranted;
-    setState(() {
-      _hasLocationPermission = granted;
-    });
+    _status.setLocationPermission(granted);
     if (granted) {
       return true;
     }
@@ -1734,12 +1703,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     try {
       final selected = await widget.mockController.getMockLocationApp();
       final isSelected = await _isMockLocationAppNative();
-      if (mounted) {
-        setState(() {
-          _selectedMockApp = selected;
-          _isMockLocationApp = isSelected;
-        });
-      }
+      _status.setSelectedMockApp(selected);
+      _status.setMockLocationApp(isSelected);
       _appendDebugLog('Mock app: ${selected ?? '—'} selected=${isSelected ? 'YES' : 'NO'}');
     } catch (_) {
       // Ignore refresh failures.
@@ -1950,7 +1915,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               location = await _getRealLocation();
                             }
                             if (location == null) {
-                              _showSnack('Real location not available yet.');
+                              _messages.showSnack('Real location not available yet.');
                               return;
                             }
                             _mapState.setCurrentPosition(location);
@@ -2016,7 +1981,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     try {
       await widget.mockController.openDeveloperSettings();
     } on PlatformException catch (error) {
-      _showSnack('Failed to open developer settings: ${error.message ?? error.code}');
+      _messages.showSnack('Failed to open developer settings: ${error.message ?? error.code}');
     }
   }
 

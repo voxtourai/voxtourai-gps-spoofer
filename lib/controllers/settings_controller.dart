@@ -13,6 +13,7 @@ class SettingsController extends ChangeNotifier {
   bool _showDebugPanel = false;
   bool _backgroundEnabled = false;
   bool _backgroundBusy = false;
+  bool _backgroundNotificationShown = false;
   DarkModeSetting _darkModeSetting = DarkModeSetting.on;
 
   bool get showMockMarker => _showMockMarker;
@@ -20,6 +21,7 @@ class SettingsController extends ChangeNotifier {
   bool get showDebugPanel => _showDebugPanel;
   bool get backgroundEnabled => _backgroundEnabled;
   bool get backgroundBusy => _backgroundBusy;
+  bool get backgroundNotificationShown => _backgroundNotificationShown;
   DarkModeSetting get darkModeSetting => _darkModeSetting;
 
   void setShowMockMarker(bool value) {
@@ -59,6 +61,14 @@ class SettingsController extends ChangeNotifier {
       return;
     }
     _backgroundBusy = value;
+    notifyListeners();
+  }
+
+  void setBackgroundNotificationShown(bool value) {
+    if (_backgroundNotificationShown == value) {
+      return;
+    }
+    _backgroundNotificationShown = value;
     notifyListeners();
   }
 

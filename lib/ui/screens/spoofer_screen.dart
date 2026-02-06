@@ -175,6 +175,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _playback.dispose();
+    _route.dispose();
+    _waypoints.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
@@ -249,214 +251,223 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    final hasRoute = _route.hasRoute;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    final controlsVisible = _route.hasRoute;
-    final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 48,
-        title: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _handleTitleTap,
-          child: const Text('GPS Spoofer'),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Search',
-            icon: const Icon(Icons.search),
-            onPressed: _openSearchScreen,
+    return AnimatedBuilder(
+      animation: Listenable.merge([_route, _waypoints, _playback]),
+      builder: (context, _) {
+        final hasRoute = _route.hasRoute;
+        final bottomInset = MediaQuery.of(context).padding.bottom;
+        final controlsVisible = _route.hasRoute;
+        final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
+
+        return Scaffold(
+          appBar: AppBar(
+            toolbarHeight: 48,
+            title: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _handleTitleTap,
+              child: const Text('GPS Spoofer'),
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Search',
+                icon: const Icon(Icons.search),
+                onPressed: _openSearchScreen,
+              ),
+              IconButton(
+                tooltip: 'Help',
+                icon: const Icon(Icons.help_outline),
+                onPressed: _openHelpScreen,
+              ),
+              IconButton(
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings),
+                onPressed: _openSettingsSheet,
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'Help',
-            icon: const Icon(Icons.help_outline),
-            onPressed: _openHelpScreen,
-          ),
-          IconButton(
-            tooltip: 'Settings',
-            icon: const Icon(Icons.settings),
-            onPressed: _openSettingsSheet,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            flex: 15,
-            child: Stack(
-              children: [
-                Listener(
-                  onPointerDown: (_) {
-                    if (_autoFollow) {
-                      setState(() {
-                        _autoFollow = false;
-                      });
-                    }
-                  },
-                  child: GoogleMap(
-                    key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
-                    initialCameraPosition: CameraPosition(
-                      target: _currentPosition ?? const LatLng(0, 0),
-                      zoom: _currentPosition == null ? 2 : 16,
-                    ),
-                    onMapCreated: _onMapCreated,
-                    onCameraMoveStarted: () {
-                      if (_isProgrammaticMove) {
-                        return;
-                      }
-                      if (_autoFollow) {
-                        setState(() {
-                          _autoFollow = false;
-                        });
-                      }
-                    },
-                    onCameraIdle: () {
-                      if (_isProgrammaticMove) {
-                        _isProgrammaticMove = false;
-                      }
-                    },
-                    onTap: (position) {
-                      if (_waypoints.selectedIndex != null) {
-                        setState(() {
-                          _waypoints.selectedIndex = null;
-                        });
-                        return;
-                      }
-                      if (_route.hasPoints || _waypoints.hasPoints) {
-                        return;
-                      }
-                      _setManualLocation(position);
-                    },
-                    onLongPress: (position) {
-                      if (_route.hasPoints && !_waypoints.usingCustomRoute) {
-                        _showSnack('Clear the loaded route to add points.');
-                        return;
-                      }
-                      _addCustomPoint(position);
-                    },
-                    markers: _markers,
-                    polylines: _polylines,
-                    mapToolbarEnabled: false,
-                    padding: EdgeInsets.only(
-                      bottom: bottomInset + 56,
-                      right: 56,
-                      left: 12,
-                    ),
-                    myLocationEnabled: _hasLocationPermission == true,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                  ),
-                ),
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Column(
-                    children: [
-                      FloatingActionButton.small(
-                        heroTag: 'load',
-                        onPressed: _route.hasPoints ? _clearRoute : _openRouteInputSheet,
-                        tooltip: _route.hasPoints ? 'Clear route' : 'Load route',
-                        child: Icon(_route.hasPoints ? Icons.close : Icons.upload),
-                      ),
-                      const SizedBox(height: 8),
-                      FloatingActionButton.small(
-                        heroTag: 'play',
-                        onPressed: hasRoute ? _togglePlayback : null,
-                        backgroundColor: hasRoute ? null : Theme.of(context).colorScheme.surfaceVariant,
-                        foregroundColor: hasRoute ? null : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
-                        tooltip: _playback.isPlaying ? 'Pause' : 'Play',
-                        child: Icon(_playback.isPlaying ? Icons.pause : Icons.play_arrow),
-                      ),
-                      if (_waypoints.usingCustomRoute && _waypoints.hasPoints) ...[
-                        const SizedBox(height: 8),
-                        FloatingActionButton.small(
-                          heroTag: 'waypoints',
-                          onPressed: _openWaypointList,
-                          tooltip: 'Waypoints',
-                          child: const Icon(Icons.list_alt),
+          body: Column(
+            children: [
+              Expanded(
+                flex: 15,
+                child: Stack(
+                  children: [
+                    Listener(
+                      onPointerDown: (_) {
+                        if (_autoFollow) {
+                          setState(() {
+                            _autoFollow = false;
+                          });
+                        }
+                      },
+                      child: GoogleMap(
+                        key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
+                        initialCameraPosition: CameraPosition(
+                          target: _currentPosition ?? const LatLng(0, 0),
+                          zoom: _currentPosition == null ? 2 : 16,
                         ),
-                      ],
-                    ],
-                  ),
-                ),
-                Positioned(
-                  right: 12,
-                  bottom: overlayBottom,
-                  child: FloatingActionButton.small(
-                    heroTag: 'recenter',
-                    onPressed: _currentPosition == null
-                        ? null
-                        : () {
+                        onMapCreated: _onMapCreated,
+                        onCameraMoveStarted: () {
+                          if (_isProgrammaticMove) {
+                            return;
+                          }
+                          if (_autoFollow) {
                             setState(() {
-                              _autoFollow = true;
+                              _autoFollow = false;
                             });
-                            _followCamera(_currentPosition!);
-                          },
-                    tooltip: 'Recenter',
-                    child: Icon(_autoFollow ? Icons.my_location : Icons.center_focus_strong),
-                  ),
-                ),
-                if (_waypoints.selectedIndex != null)
-                  Positioned(
-                    left: 12,
-                    right: 72,
-                    bottom: overlayBottom,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              final idx = _waypoints.selectedIndex;
-                              if (idx != null) {
-                                _renameCustomPoint(idx);
-                              }
-                            },
-                            icon: const Icon(Icons.edit),
-                            label: const Text('Rename'),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                          ),
+                          }
+                        },
+                        onCameraIdle: () {
+                          if (_isProgrammaticMove) {
+                            _isProgrammaticMove = false;
+                          }
+                        },
+                        onTap: (position) {
+                          if (_waypoints.selectedIndex != null) {
+                            _waypoints.setSelectedIndex(null);
+                            setState(() {
+                              _rebuildCustomMarkers();
+                              _refreshMarkers();
+                            });
+                            return;
+                          }
+                          if (_route.hasPoints || _waypoints.hasPoints) {
+                            return;
+                          }
+                          _setManualLocation(position);
+                        },
+                        onLongPress: (position) {
+                          if (_route.hasPoints && !_waypoints.usingCustomRoute) {
+                            _showSnack('Clear the loaded route to add points.');
+                            return;
+                          }
+                          _addCustomPoint(position);
+                        },
+                        markers: _markers,
+                        polylines: _polylines,
+                        mapToolbarEnabled: false,
+                        padding: EdgeInsets.only(
+                          bottom: bottomInset + 56,
+                          right: 56,
+                          left: 12,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              final idx = _waypoints.selectedIndex;
-                              if (idx != null) {
-                                _removeCustomPoint(idx);
-                              }
-                            },
-                            icon: const Icon(Icons.delete),
-                            label: const Text('Delete'),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                          ),
-                        ),
-                      ],
+                        myLocationEnabled: _hasLocationPermission == true,
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                      ),
                     ),
-                  ),
-              ],
-            ),
+                    Positioned(
+                      right: 12,
+                      top: 12,
+                      child: Column(
+                        children: [
+                          FloatingActionButton.small(
+                            heroTag: 'load',
+                            onPressed: _route.hasPoints ? _clearRoute : _openRouteInputSheet,
+                            tooltip: _route.hasPoints ? 'Clear route' : 'Load route',
+                            child: Icon(_route.hasPoints ? Icons.close : Icons.upload),
+                          ),
+                          const SizedBox(height: 8),
+                          FloatingActionButton.small(
+                            heroTag: 'play',
+                            onPressed: hasRoute ? _togglePlayback : null,
+                            backgroundColor: hasRoute ? null : Theme.of(context).colorScheme.surfaceVariant,
+                            foregroundColor:
+                                hasRoute ? null : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
+                            tooltip: _playback.isPlaying ? 'Pause' : 'Play',
+                            child: Icon(_playback.isPlaying ? Icons.pause : Icons.play_arrow),
+                          ),
+                          if (_waypoints.usingCustomRoute && _waypoints.hasPoints) ...[
+                            const SizedBox(height: 8),
+                            FloatingActionButton.small(
+                              heroTag: 'waypoints',
+                              onPressed: _openWaypointList,
+                              tooltip: 'Waypoints',
+                              child: const Icon(Icons.list_alt),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      right: 12,
+                      bottom: overlayBottom,
+                      child: FloatingActionButton.small(
+                        heroTag: 'recenter',
+                        onPressed: _currentPosition == null
+                            ? null
+                            : () {
+                                setState(() {
+                                  _autoFollow = true;
+                                });
+                                _followCamera(_currentPosition!);
+                              },
+                        tooltip: 'Recenter',
+                        child: Icon(_autoFollow ? Icons.my_location : Icons.center_focus_strong),
+                      ),
+                    ),
+                    if (_waypoints.selectedIndex != null)
+                      Positioned(
+                        left: 12,
+                        right: 72,
+                        bottom: overlayBottom,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () {
+                                  final idx = _waypoints.selectedIndex;
+                                  if (idx != null) {
+                                    _renameCustomPoint(idx);
+                                  }
+                                },
+                                icon: const Icon(Icons.edit),
+                                label: const Text('Rename'),
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () {
+                                  final idx = _waypoints.selectedIndex;
+                                  if (idx != null) {
+                                    _removeCustomPoint(idx);
+                                  }
+                                },
+                                icon: const Icon(Icons.delete),
+                                label: const Text('Delete'),
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                transitionBuilder: (child, animation) => SizeTransition(
+                  sizeFactor: animation,
+                  axisAlignment: -1,
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+                child: _route.hasRoute
+                    ? SafeArea(
+                        key: const ValueKey('controls'),
+                        top: false,
+                        child: _buildControls(context),
+                      )
+                    : const SizedBox.shrink(key: ValueKey('no-controls')),
+              ),
+            ],
           ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            transitionBuilder: (child, animation) => SizeTransition(
-              sizeFactor: animation,
-              axisAlignment: -1,
-              child: FadeTransition(opacity: animation, child: child),
-            ),
-            child: _route.hasRoute
-                ? SafeArea(
-                    key: const ValueKey('controls'),
-                    top: false,
-                    child: _buildControls(context),
-                  )
-                : const SizedBox.shrink(key: ValueKey('no-controls')),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -544,9 +555,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                   max: 200,
                   divisions: 200,
                   onChanged: (value) {
-                    setState(() {
-                      _playback.speedMps = value;
-                    });
+                    _playback.speedMps = value;
                   },
                 ),
               ],
@@ -1108,7 +1117,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     _playback.start(_onTick);
-    setState(() {});
   }
 
   void _stopPlayback() {
@@ -1116,7 +1124,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     _playback.stop();
-    setState(() {});
   }
 
   void _onTick() {
@@ -1219,7 +1226,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           position: _waypoints.points[i],
           draggable: true,
           onDragEnd: (pos) {
-            _waypoints.points[i] = pos;
+            _waypoints.updatePoint(i, pos);
             _stopPlayback();
             _rebuildCustomRoute();
             _selectCustomPoint(i);
@@ -1279,35 +1286,21 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _showSnack('Clear the loaded route to edit a custom route.');
       return;
     }
-    _waypoints.usingCustomRoute = true;
     _stopPlayback();
-    _waypoints.names.add(_defaultWaypointName(_waypoints.points.length));
-    _waypoints.points.add(position);
+    _waypoints.addPoint(position);
     _rebuildCustomRoute();
     _followCamera(position);
   }
 
   void _removeCustomPoint(int index) {
-    if (index < 0 || index >= _waypoints.points.length) {
-      return;
-    }
     _stopPlayback();
-    _waypoints.names.removeAt(index);
-    _waypoints.points.removeAt(index);
-    if (_waypoints.points.isEmpty) {
-      _waypoints.usingCustomRoute = false;
-      _waypoints.names.clear();
-    }
-    if (_waypoints.selectedIndex == index) {
-      _waypoints.selectedIndex = null;
-    }
-    _normalizeWaypointNames();
+    _waypoints.removePoint(index);
     _rebuildCustomRoute();
   }
 
   void _selectCustomPoint(int index) {
     setState(() {
-      _waypoints.selectedIndex = index;
+      _waypoints.setSelectedIndex(index);
       _rebuildCustomMarkers();
       _refreshMarkers();
     });
@@ -1449,63 +1442,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     setState(() {
-      _waypoints.usingCustomRoute = true;
-      _waypoints.points
-        ..clear()
-        ..addAll(points);
-      _waypoints.names
-        ..clear()
-        ..addAll(
-          names.length == points.length ? names : List.generate(points.length, _defaultWaypointName),
-        );
-      _waypoints.selectedIndex = null;
+      _waypoints.setFromSaved(points, names);
     });
     _rebuildCustomRoute();
     _fitRouteToMap();
   }
 
   void _reorderCustomPoints(int oldIndex, int newIndex) {
-    if (oldIndex < 0 || oldIndex >= _waypoints.points.length) {
-      return;
-    }
-    if (newIndex < 0 || newIndex > _waypoints.points.length) {
-      return;
-    }
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
-    if (newIndex == oldIndex) {
-      return;
-    }
     _stopPlayback();
-    final point = _waypoints.points.removeAt(oldIndex);
-    final name = _waypoints.names.removeAt(oldIndex);
-    _waypoints.points.insert(newIndex, point);
-    _waypoints.names.insert(newIndex, name);
-
-    if (_waypoints.selectedIndex != null) {
-      final selected = _waypoints.selectedIndex!;
-      if (selected == oldIndex) {
-        _waypoints.selectedIndex = newIndex;
-      } else if (oldIndex < selected && newIndex >= selected) {
-        _waypoints.selectedIndex = selected - 1;
-      } else if (oldIndex > selected && newIndex <= selected) {
-        _waypoints.selectedIndex = selected + 1;
-      }
-    }
-    _normalizeWaypointNames();
+    _waypoints.reorder(oldIndex, newIndex);
     _rebuildCustomRoute();
   }
 
-  String _defaultWaypointName(int index) => 'Waypoint ${index + 1}';
-
-  void _normalizeWaypointNames() {
-    for (var i = 0; i < _waypoints.names.length; i++) {
-      if (RegExp(r'^Waypoint\\s+\\d+$').hasMatch(_waypoints.names[i])) {
-        _waypoints.names[i] = _defaultWaypointName(i);
-      }
-    }
-  }
+  String _defaultWaypointName(int index) => _waypoints.defaultName(index);
 
   Future<void> _renameCustomPoint(int index) async {
     if (index < 0 || index >= _waypoints.points.length) {
@@ -1566,7 +1515,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     setState(() {
-      _waypoints.names[index] = result;
+      _waypoints.renamePoint(index, result);
       _rebuildCustomMarkers();
       _refreshMarkers();
     });

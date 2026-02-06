@@ -1,6 +1,8 @@
 import 'dart:async';
 
-class PlaybackController {
+import 'package:flutter/foundation.dart';
+
+class PlaybackController extends ChangeNotifier {
   PlaybackController({double initialSpeedMps = 2, Duration tickInterval = const Duration(milliseconds: 50)})
       : _speedMps = initialSpeedMps,
         _tickInterval = tickInterval;
@@ -18,11 +20,19 @@ class PlaybackController {
   double get speedMps => _speedMps;
 
   set speedMps(double value) {
+    if (_speedMps == value) {
+      return;
+    }
     _speedMps = value;
+    notifyListeners();
   }
 
   void setResumeAfterPause(bool value) {
+    if (_resumeAfterPause == value) {
+      return;
+    }
     _resumeAfterPause = value;
+    notifyListeners();
   }
 
   void start(void Function() onTick) {
@@ -34,6 +44,7 @@ class PlaybackController {
     _lastTickAt = DateTime.now();
     _timer?.cancel();
     _timer = Timer.periodic(_tickInterval, (_) => _onTick?.call());
+    notifyListeners();
   }
 
   void stop() {
@@ -44,6 +55,7 @@ class PlaybackController {
     _timer = null;
     _lastTickAt = null;
     _isPlaying = false;
+    notifyListeners();
   }
 
   void markTick() {
@@ -63,5 +75,6 @@ class PlaybackController {
 
   void dispose() {
     _timer?.cancel();
+    super.dispose();
   }
 }

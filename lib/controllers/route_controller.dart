@@ -1,9 +1,10 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class RouteController {
+class RouteController extends ChangeNotifier {
   List<LatLng> _points = [];
   List<double> _cumulativeMeters = [];
   double _totalDistanceMeters = 0;
@@ -23,6 +24,7 @@ class RouteController {
     _cumulativeMeters = [];
     _totalDistanceMeters = 0;
     _progress = 0;
+    notifyListeners();
   }
 
   void setRoute(List<LatLng> points) {
@@ -30,10 +32,16 @@ class RouteController {
     _cumulativeMeters = _buildCumulativeMeters(points);
     _totalDistanceMeters = _cumulativeMeters.isEmpty ? 0 : _cumulativeMeters.last;
     _progress = 0;
+    notifyListeners();
   }
 
   void setProgress(double value) {
-    _progress = _clamp01(value);
+    final next = _clamp01(value);
+    if (_progress == next) {
+      return;
+    }
+    _progress = next;
+    notifyListeners();
   }
 
   double distanceForProgress(double progress) {

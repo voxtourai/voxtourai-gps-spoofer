@@ -18,6 +18,7 @@ import '../../controllers/map_state_controller.dart';
 import '../../controllers/playback_controller.dart';
 import '../../controllers/preferences_controller.dart';
 import '../../controllers/route_controller.dart';
+import '../../controllers/route_workflow_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../controllers/waypoint_controller.dart';
@@ -46,8 +47,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   GoogleMapController? _mapController;
   final MapStateController _mapState = MapStateController();
+  late final RouteWorkflowController _routeState =
+      RouteWorkflowController(
+        mapState: _mapState,
+        onRouteEdited: _stopPlayback,
+        onMarkersChanged: _refreshMarkers,
+      );
 
-  final RouteController _route = RouteController();
+  RouteController get _route => _routeState.route;
+  WaypointController get _waypoints => _routeState.waypoints;
 
   final PlaybackController _playback = PlaybackController();
   final SettingsController _settings = SettingsController();
@@ -60,7 +68,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _startupChecksRunning = false;
   Map<String, Object?>? _lastMockStatus;
   String? _selectedMockApp;
-  final WaypointController _waypoints = WaypointController();
   bool _backgroundNotificationShown = false;
   final List<String> _debugLog = [];
   String? _lastDebugMessage;
@@ -160,9 +167,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _overlayMessage?.remove();
     _overlayMessage = null;
     _playback.dispose();
-    _route.dispose();
     _mapState.dispose();
-    _waypoints.dispose();
+    _routeState.dispose();
     _settings.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
@@ -239,7 +245,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_route, _waypoints, _playback, _settings, _mapState]),
+      animation: Listenable.merge([_routeState, _playback, _settings, _mapState]),
       builder: (context, _) {
         final hasRoute = _route.hasRoute;
         final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -306,9 +312,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         },
                         onTap: (position) {
                           if (_waypoints.selectedIndex != null) {
-                            _waypoints.setSelectedIndex(null);
-                            _rebuildCustomMarkers();
-                            _refreshMarkers();
+                            _routeState.selectWaypoint(null);
                             return;
                           }
                           if (_route.hasPoints || _waypoints.hasPoints) {
@@ -530,9 +534,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _clearRoute() {
     _stopPlayback();
-    _route.clear();
-    _waypoints.clear();
-    _mapState.clearRouteState();
+    _routeState.clearAll();
   }
 
   void _appendDebugLog(String message) {
@@ -878,8 +880,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         _showSnack('Failed to decode polyline.');
         return;
       }
-      _waypoints.clear();
-      _mapState.setCustomMarkers(const {});
       _setRoute(points);
       _fitRouteToMap();
     } catch (error) {
@@ -960,15 +960,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _setRoute(List<LatLng> points) {
-    _route.setRoute(points);
-    _mapState.setPolylines({
-      Polyline(
-        polylineId: const PolylineId('route'),
-        color: Colors.blueAccent,
-        width: 4,
-        points: _route.points,
-      ),
-    });
+    _routeState.setRouteFromPoints(points);
     _setProgress(0);
   }
 
@@ -1078,85 +1070,27 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _mapState.setMarkers(markers);
   }
 
-  void _rebuildCustomMarkers() {
-    if (_waypoints.points.isEmpty) {
-      _mapState.setCustomMarkers(const {});
-      return;
-    }
-    _mapState.setCustomMarkers({
-      for (var i = 0; i < _waypoints.points.length; i++)
-        Marker(
-          markerId: MarkerId('wp_$i'),
-          position: _waypoints.points[i],
-          draggable: true,
-          onDragEnd: (pos) {
-            _waypoints.updatePoint(i, pos);
-            _stopPlayback();
-            _rebuildCustomRoute();
-            _selectCustomPoint(i);
-          },
-          onTap: () {
-            _selectCustomPoint(i);
-          },
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            i == _waypoints.selectedIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
-          ),
-          infoWindow: InfoWindow(
-            title: _waypoints.names.length > i ? _waypoints.names[i] : _defaultWaypointName(i),
-            snippet: 'Hold and drag to move',
-          ),
-          zIndex: 2,
-        ),
-    });
-  }
-
-  void _rebuildCustomRoute() {
-    _rebuildCustomMarkers();
-    if (_waypoints.points.isEmpty) {
-      _route.clear();
-      _mapState.setPolylines(const {});
-      _mapState.setCurrentPosition(null, updateLastInjected: true);
-      _refreshMarkers();
-      return;
-    }
-
-    _route.setRoute(List<LatLng>.from(_waypoints.points));
-    _mapState.setPolylines(
-      _route.hasRoute
-          ? {
-              Polyline(
-                polylineId: const PolylineId('route'),
-                color: Colors.blueAccent,
-                width: 4,
-                points: _route.points,
-              ),
-            }
-          : const {},
-    );
-    _setProgress(0);
-  }
-
   void _addCustomPoint(LatLng position) {
     if (_route.hasPoints && !_waypoints.usingCustomRoute) {
       _showSnack('Clear the loaded route to edit a custom route.');
       return;
     }
-    _stopPlayback();
-    _waypoints.addPoint(position);
-    _rebuildCustomRoute();
+    _routeState.addWaypoint(position);
+    if (_route.hasPoints) {
+      _setProgress(0);
+    }
     _followCamera(position);
   }
 
   void _removeCustomPoint(int index) {
-    _stopPlayback();
-    _waypoints.removePoint(index);
-    _rebuildCustomRoute();
+    _routeState.removeWaypoint(index);
+    if (_route.hasPoints) {
+      _setProgress(0);
+    }
   }
 
   void _selectCustomPoint(int index) {
-    _waypoints.setSelectedIndex(index);
-    _rebuildCustomMarkers();
-    _refreshMarkers();
+    _routeState.selectWaypoint(index);
   }
 
   Future<void> _saveCustomRoute() async {
@@ -1276,17 +1210,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _showSnack('Saved route is empty.');
       return;
     }
-    setState(() {
-      _waypoints.setFromSaved(points, names);
-    });
-    _rebuildCustomRoute();
+    _routeState.setWaypointsFromSaved(points, names);
+    if (_route.hasPoints) {
+      _setProgress(0);
+    }
     _fitRouteToMap();
   }
 
   void _reorderCustomPoints(int oldIndex, int newIndex) {
-    _stopPlayback();
-    _waypoints.reorder(oldIndex, newIndex);
-    _rebuildCustomRoute();
+    _routeState.reorderWaypoints(oldIndex, newIndex);
+    if (_route.hasPoints) {
+      _setProgress(0);
+    }
   }
 
   String _defaultWaypointName(int index) => _waypoints.defaultName(index);
@@ -1349,11 +1284,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (result == null) {
       return;
     }
-    setState(() {
-      _waypoints.renamePoint(index, result);
-      _rebuildCustomMarkers();
-      _refreshMarkers();
-    });
+    _routeState.renameWaypoint(index, result);
+    _refreshMarkers();
   }
 
   Future<void> _openWaypointList() async {

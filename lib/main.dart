@@ -817,14 +817,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           title: const Text('App info'),
           content: info == null
               ? const Text('Version info unavailable.')
-              : Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Version: ${info.version}'),
-                    Text('Build: ${info.buildNumber}'),
-                    Text('App ID: ${info.packageName}'),
-                  ],
+              : DefaultTextStyle.merge(
+                  style: Theme.of(context).textTheme.bodySmall,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Version: ${info.version}'),
+                      Text('Build: ${info.buildNumber}'),
+                      Text('App ID: ${info.packageName}'),
+                    ],
+                  ),
                 ),
           actions: [
             TextButton(

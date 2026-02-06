@@ -148,7 +148,7 @@ class RouteWorkflowController extends ChangeNotifier {
             title: _waypoints.names.length > i ? _waypoints.names[i] : _waypoints.defaultName(i),
             snippet: 'Hold and drag to move',
           ),
-          zIndex: 2,
+          zIndexInt: 2,
         ),
     });
     _onMarkersChanged?.call();

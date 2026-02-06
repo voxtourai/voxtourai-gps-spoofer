@@ -73,6 +73,7 @@ class PlaybackController extends ChangeNotifier {
     return deltaSeconds;
   }
 
+  @override
   void dispose() {
     _timer?.cancel();
     super.dispose();

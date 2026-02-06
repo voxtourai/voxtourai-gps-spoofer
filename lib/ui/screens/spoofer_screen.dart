@@ -1035,7 +1035,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           position: currentPosition,
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: const InfoWindow(title: 'Mocked GPS'),
-          zIndex: 1,
+          zIndexInt: 1,
         ),
       );
     }
@@ -1496,7 +1496,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     _overlayMessage?.remove();
     _overlayMessage = null;
-    final overlay = Overlay.of(context, rootOverlay: true);
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) {
       _showSnack(message);
       return;

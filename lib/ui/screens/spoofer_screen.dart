@@ -16,6 +16,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/mock_location_controller.dart';
+import '../../controllers/playback_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../models/help_section.dart';
 import '../map/map_style.dart';
@@ -57,16 +58,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   List<double> _cumulativeMeters = [];
   double _totalDistanceMeters = 0;
   double _progress = 0;
-  double _speedMps = 2;
 
   LatLng? _currentPosition;
   Set<Polyline> _polylines = const {};
   Set<Marker> _markers = const {};
 
-  bool _isPlaying = false;
-  Timer? _playbackTimer;
-  DateTime? _lastTickAt;
-  bool _resumeAfterPause = false;
+  final PlaybackController _playback = PlaybackController();
   String? _mockError;
   DateTime? _lastMockErrorAt;
   bool? _hasLocationPermission;
@@ -182,7 +179,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _playbackTimer?.cancel();
+    _playback.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
@@ -199,13 +196,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     if (state == AppLifecycleState.resumed) {
-      if (_resumeAfterPause) {
-        _resumeAfterPause = false;
+      if (_playback.resumeAfterPause) {
+        _playback.setResumeAfterPause(false);
         _startPlayback();
       }
     } else {
-      if (_isPlaying) {
-        _resumeAfterPause = true;
+      if (_playback.isPlaying) {
+        _playback.setResumeAfterPause(true);
         _stopPlayback();
       }
     }
@@ -372,8 +369,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         onPressed: hasRoute ? _togglePlayback : null,
                         backgroundColor: hasRoute ? null : Theme.of(context).colorScheme.surfaceVariant,
                         foregroundColor: hasRoute ? null : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
-                        tooltip: _isPlaying ? 'Pause' : 'Play',
-                        child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
+                        tooltip: _playback.isPlaying ? 'Pause' : 'Play',
+                        child: Icon(_playback.isPlaying ? Icons.pause : Icons.play_arrow),
                       ),
                       if (_usingCustomRoute && _customPoints.isNotEmpty) ...[
                         const SizedBox(height: 8),
@@ -528,7 +525,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     max: 1,
                     onChanged: hasRoute
                         ? (value) {
-                            _lastTickAt = DateTime.now();
+                            _playback.markTick();
                             _setProgress(value);
                           }
                         : null,
@@ -540,20 +537,20 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                   children: [
                     Text('Speed', style: Theme.of(context).textTheme.labelMedium),
                     Text(
-                      '${_speedMps.toStringAsFixed(0)} m/s',
+                      '${_playback.speedMps.toStringAsFixed(0)} m/s',
                       style: Theme.of(context).textTheme.labelMedium,
                     ),
                   ],
                 ),
                 UniformSlider(
                   theme: speedSliderTheme,
-                  value: _speedMps,
+                  value: _playback.speedMps,
                   min: -200,
                   max: 200,
                   divisions: 200,
                   onChanged: (value) {
                     setState(() {
-                      _speedMps = value;
+                      _playback.speedMps = value;
                     });
                   },
                 ),
@@ -1115,7 +1112,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _togglePlayback() {
-    if (_isPlaying) {
+    if (_playback.isPlaying) {
       _stopPlayback();
     } else {
       _startPlayback();
@@ -1126,41 +1123,29 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (_routePoints.length < 2 || _totalDistanceMeters == 0) {
       return;
     }
-    setState(() {
-      _isPlaying = true;
-    });
-    _lastTickAt = DateTime.now();
-    _playbackTimer?.cancel();
-    _playbackTimer = Timer.periodic(const Duration(milliseconds: 50), (_) => _onTick());
+    _playback.start(_onTick);
+    setState(() {});
   }
 
   void _stopPlayback() {
-    if (!_isPlaying) {
+    if (!_playback.isPlaying) {
       return;
     }
-    _playbackTimer?.cancel();
-    _playbackTimer = null;
-    _lastTickAt = null;
-    setState(() {
-      _isPlaying = false;
-    });
+    _playback.stop();
+    setState(() {});
   }
 
   void _onTick() {
-    if (!_isPlaying || _routePoints.length < 2) {
+    if (!_playback.isPlaying || _routePoints.length < 2) {
       return;
     }
 
-    final now = DateTime.now();
-    if (_lastTickAt == null) {
-      _lastTickAt = now;
+    final deltaSeconds = _playback.consumeDeltaSeconds();
+    if (deltaSeconds == null) {
       return;
     }
 
-    final deltaSeconds = now.difference(_lastTickAt!).inMicroseconds / 1000000.0;
-    _lastTickAt = now;
-
-    final speedMps = _speedMps;
+    final speedMps = _playback.speedMps;
     final currentDistance = _progress * _totalDistanceMeters;
     final nextDistance = currentDistance + speedMps * deltaSeconds;
 
@@ -1754,7 +1739,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _sendMockLocation(LatLng position) async {
-    final speedMps = _speedMps.abs();
+    final speedMps = _playback.speedMps.abs();
     final hadError = _mockError != null;
     try {
       final result = await widget.mockController.setMockLocation(

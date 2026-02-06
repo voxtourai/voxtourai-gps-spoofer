@@ -12,10 +12,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart'
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/playback_controller.dart';
+import '../../controllers/preferences_controller.dart';
 import '../../controllers/route_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
@@ -26,8 +26,6 @@ import '../widgets/uniform_slider.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
 
-const String _tosAcceptedKey = 'tos_accepted_v1';
-const String _savedRoutesKey = 'saved_custom_routes_v1';
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 
@@ -57,6 +55,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   final PlaybackController _playback = PlaybackController();
   final SettingsController _settings = SettingsController();
+  final PreferencesController _prefs = PreferencesController();
   String? _mockError;
   DateTime? _lastMockErrorAt;
   bool? _hasLocationPermission;
@@ -1328,33 +1327,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _upsertSavedRoute(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_savedRoutesKey);
-    final List<dynamic> routes = raw == null ? [] : (jsonDecode(raw) as List<dynamic>);
-    final entry = {
-      'name': name,
-      'points': [
-        for (final p in _waypoints.points)
-          {
-            'lat': p.latitude,
-            'lng': p.longitude,
-          }
-      ],
-      'names': List<String>.from(_waypoints.names),
-    };
-    final index = routes.indexWhere((e) => e is Map && e['name'] == name);
-    if (index >= 0) {
-      routes[index] = entry;
-    } else {
-      routes.add(entry);
-    }
-    await prefs.setString(_savedRoutesKey, jsonEncode(routes));
+    await _prefs.upsertSavedRoute(
+      name: name,
+      points: _waypoints.points,
+      names: _waypoints.names,
+    );
   }
 
   Future<bool> _openSavedRoutes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_savedRoutesKey);
-    final List<dynamic> routes = raw == null ? [] : (jsonDecode(raw) as List<dynamic>);
+    final routes = await _prefs.loadSavedRoutes();
     if (routes.isEmpty) {
       _showSnack('No saved routes yet.');
       return false;
@@ -1370,7 +1351,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               itemCount: routes.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, index) {
-                final item = routes[index] as Map;
+                final item = routes[index];
                 final name = item['name']?.toString() ?? 'Route';
                 final points = (item['points'] as List?) ?? [];
                 return ListTile(
@@ -1385,7 +1366,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     icon: const Icon(Icons.delete),
                     onPressed: () async {
                       routes.removeAt(index);
-                      await prefs.setString(_savedRoutesKey, jsonEncode(routes));
+                      await _prefs.saveRoutes(routes);
                       setSheetState(() {});
                     },
                   ),
@@ -1755,8 +1736,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return true;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool(_tosAcceptedKey) ?? false;
+    final accepted = await _prefs.isTosAccepted();
     if (accepted) {
       _tosAccepted = true;
       return true;
@@ -1781,7 +1761,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           actions: [
             FilledButton(
               onPressed: () async {
-                await prefs.setBool(_tosAcceptedKey, true);
+                await _prefs.setTosAccepted(true);
                 if (context.mounted) {
                   Navigator.of(context).pop();
                 }
@@ -1793,7 +1773,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       ),
     );
 
-    _tosAccepted = prefs.getBool(_tosAcceptedKey) ?? false;
+    _tosAccepted = await _prefs.isTosAccepted();
     return _tosAccepted;
   }
 

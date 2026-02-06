@@ -326,6 +326,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         ),
         actions: [
           IconButton(
+            tooltip: 'Search',
+            icon: const Icon(Icons.search),
+            onPressed: _openSearchScreen,
+          ),
+          IconButton(
             tooltip: 'Help',
             icon: const Icon(Icons.help_outline),
             onPressed: _openHelpSheet,
@@ -832,207 +837,25 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
-  Future<void> _openSearchSheet() async {
-    final controller = TextEditingController();
-    List<_GeocodeResult> results = [];
-    bool searching = false;
-    String? error;
-    var sheetOpen = true;
-
-    Future<void> runSearch(String query, StateSetter setSheetState) async {
-      final trimmed = query.trim();
-      if (trimmed.isEmpty) {
-        if (sheetOpen) {
-          setSheetState(() {
-            results = [];
-            error = null;
-          });
-        }
-        return;
-      }
-      if (sheetOpen) {
-        setSheetState(() {
-          searching = true;
-          error = null;
-        });
-      }
-      try {
-        final response = await _mockChannel.invokeMethod<List<dynamic>>('geocodeAddress', {
-          'query': trimmed,
-          'maxResults': 8,
-        });
-        final parsed = <_GeocodeResult>[];
-        for (final entry in response ?? []) {
-          if (entry is! Map) {
-            continue;
-          }
-          final lat = entry['lat'];
-          final lng = entry['lng'];
-          if (lat is! num || lng is! num) {
-            continue;
-          }
-          final address = entry['address']?.toString() ?? 'Unknown location';
-          parsed.add(
-            _GeocodeResult(
-              address: address,
-              location: LatLng(lat.toDouble(), lng.toDouble()),
-              country: entry['country']?.toString(),
-              adminArea: entry['adminArea']?.toString(),
-              locality: entry['locality']?.toString(),
-              subLocality: entry['subLocality']?.toString(),
-              thoroughfare: entry['thoroughfare']?.toString(),
-              subThoroughfare: entry['subThoroughfare']?.toString(),
-            ),
-          );
-        }
-        if (sheetOpen) {
-          setSheetState(() {
-            searching = false;
-            results = parsed;
-            error = parsed.isEmpty ? 'No results found.' : null;
-          });
-        }
-        _appendDebugLog('Geocode "$trimmed": ${parsed.length} results');
-      } on PlatformException catch (errorValue) {
-        if (sheetOpen) {
-          setSheetState(() {
-            searching = false;
-            results = [];
-            error = errorValue.message ?? 'Search failed.';
-          });
-        }
-        _appendDebugLog('Geocode error: ${errorValue.code}');
-      } catch (errorValue) {
-        if (sheetOpen) {
-          setSheetState(() {
-            searching = false;
-            results = [];
-            error = 'Search failed: $errorValue';
-          });
-        }
-        _appendDebugLog('Geocode exception: $errorValue');
-      }
+  Future<void> _openSearchScreen() async {
+    if (!mounted) {
+      return;
     }
-
-    void closeSheet(BuildContext context) {
-      sheetOpen = false;
-      Navigator.of(context).pop();
-    }
-
-    final sheetFuture = showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SafeArea(
-              child: SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                width: double.infinity,
-                child: AnimatedPadding(
-                  duration: const Duration(milliseconds: 150),
-                  padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          child: Row(
-                            children: [
-                              Text('Search', style: Theme.of(context).textTheme.titleMedium),
-                              const Spacer(),
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: () => closeSheet(context),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: TextField(
-                            controller: controller,
-                            autofocus: true,
-                            decoration: InputDecoration(
-                              hintText: 'Search places',
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: searching
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
-                                      ),
-                                    )
-                                  : IconButton(
-                                      icon: const Icon(Icons.arrow_forward),
-                                      onPressed: () => runSearch(controller.text, setSheetState),
-                                    ),
-                              border: const OutlineInputBorder(),
-                            ),
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (value) => runSearch(value, setSheetState),
-                          ),
-                        ),
-                      ),
-                      if (error != null)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                            child: Text(error!, style: Theme.of(context).textTheme.bodySmall),
-                          ),
-                        ),
-                      if (results.isEmpty)
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(child: Text('No results yet.')),
-                        )
-                      else
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final item = results[index];
-                              return Column(
-                                children: [
-                                  ListTile(
-                                    title: Text(item.address),
-                                    onTap: () {
-                                      closeSheet(context);
-                                      Future.microtask(() {
-                                        _setManualLocation(
-                                          item.location,
-                                          force: true,
-                                          zoom: item.suggestedZoom,
-                                        );
-                                      });
-                                    },
-                                  ),
-                                  if (index != results.length - 1) const Divider(height: 1),
-                                ],
-                              );
-                            },
-                            childCount: results.length,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (context) => _SearchScreen(
+          mockChannel: _mockChannel,
+          onSelect: (result) {
+            _setManualLocation(
+              result.location,
+              force: true,
+              zoom: result.suggestedZoom,
             );
           },
-        );
-      },
+          onLog: _appendDebugLog,
+        ),
+      ),
     );
-    sheetFuture.whenComplete(() {
-      sheetOpen = false;
-      FocusManager.instance.primaryFocus?.unfocus();
-    });
-    await sheetFuture;
-    controller.dispose();
   }
 
   Widget _buildDebugPanel(BuildContext context) {
@@ -2786,5 +2609,172 @@ class _GeocodeResult {
 
   static bool _hasValue(String? value) {
     return value != null && value.trim().isNotEmpty;
+  }
+}
+
+class _SearchScreen extends StatefulWidget {
+  const _SearchScreen({
+    required this.mockChannel,
+    required this.onSelect,
+    required this.onLog,
+  });
+
+  final MethodChannel mockChannel;
+  final void Function(_GeocodeResult result) onSelect;
+  final void Function(String message) onLog;
+
+  @override
+  State<_SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<_SearchScreen> {
+  final TextEditingController _controller = TextEditingController();
+  List<_GeocodeResult> _results = [];
+  bool _searching = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _runSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _results = [];
+        _error = null;
+      });
+      return;
+    }
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
+    try {
+      final response = await widget.mockChannel.invokeMethod<List<dynamic>>('geocodeAddress', {
+        'query': trimmed,
+        'maxResults': 8,
+      });
+      if (!mounted) {
+        return;
+      }
+      final parsed = <_GeocodeResult>[];
+      for (final entry in response ?? []) {
+        if (entry is! Map) {
+          continue;
+        }
+        final lat = entry['lat'];
+        final lng = entry['lng'];
+        if (lat is! num || lng is! num) {
+          continue;
+        }
+        final address = entry['address']?.toString() ?? 'Unknown location';
+        parsed.add(
+          _GeocodeResult(
+            address: address,
+            location: LatLng(lat.toDouble(), lng.toDouble()),
+            country: entry['country']?.toString(),
+            adminArea: entry['adminArea']?.toString(),
+            locality: entry['locality']?.toString(),
+            subLocality: entry['subLocality']?.toString(),
+            thoroughfare: entry['thoroughfare']?.toString(),
+            subThoroughfare: entry['subThoroughfare']?.toString(),
+          ),
+        );
+      }
+      setState(() {
+        _searching = false;
+        _results = parsed;
+        _error = parsed.isEmpty ? 'No results found.' : null;
+      });
+      widget.onLog('Geocode "$trimmed": ${parsed.length} results');
+    } on PlatformException catch (errorValue) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _searching = false;
+        _results = [];
+        _error = errorValue.message ?? 'Search failed.';
+      });
+      widget.onLog('Geocode error: ${errorValue.code}');
+    } catch (errorValue) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _searching = false;
+        _results = [];
+        _error = 'Search failed: $errorValue';
+      });
+      widget.onLog('Geocode exception: $errorValue');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Search'),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: TextField(
+                controller: _controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search places',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searching
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.arrow_forward),
+                          onPressed: () => _runSearch(_controller.text),
+                        ),
+                  border: const OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.search,
+                onSubmitted: (value) => _runSearch(value),
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(_error!, style: Theme.of(context).textTheme.bodySmall),
+              ),
+            Expanded(
+              child: _results.isEmpty
+                  ? const Center(child: Text('No results yet.'))
+                  : ListView.separated(
+                      itemCount: _results.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final item = _results[index];
+                        return ListTile(
+                          title: Text(item.address),
+                          onTap: () {
+                            widget.onSelect(item);
+                            Navigator.of(context).pop();
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

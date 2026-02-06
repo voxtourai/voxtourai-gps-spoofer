@@ -73,6 +73,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final List<String> _debugLog = [];
   String? _lastDebugMessage;
   DateTime? _lastDebugAt;
+  OverlayEntry? _overlayMessage;
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
@@ -164,6 +165,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _overlayMessage?.remove();
+    _overlayMessage = null;
     _playback.dispose();
     _route.dispose();
     _waypoints.dispose();
@@ -481,6 +484,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             ),
           ),
           actions: [
+            IconButton(
+              tooltip: 'Clear',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: controller.clear,
+            ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
@@ -488,9 +496,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             TextButton(
               onPressed: () {
                 controller.text = _samplePolyline;
-                _routeController.text = _samplePolyline;
-                Navigator.of(context).pop();
-                _loadRouteFromInput();
+                controller.selection = TextSelection.collapsed(
+                  offset: controller.text.length,
+                );
+                _showOverlayMessage('Filled demo route.');
               },
               child: const Text('Demo'),
             ),
@@ -1619,6 +1628,63 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showOverlayMessage(String message) {
+    if (!mounted) {
+      return;
+    }
+    _overlayMessage?.remove();
+    _overlayMessage = null;
+    final overlay = Overlay.of(context, rootOverlay: true);
+    if (overlay == null) {
+      _showSnack(message);
+      return;
+    }
+    final entry = OverlayEntry(
+      builder: (context) {
+        final colors = Theme.of(context).colorScheme;
+        return Positioned(
+          left: 16,
+          right: 16,
+          bottom: 16,
+          child: SafeArea(
+            top: false,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: colors.inverseSurface.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  message,
+                  style: TextStyle(color: colors.onInverseSurface),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    overlay.insert(entry);
+    _overlayMessage = entry;
+    Future.delayed(const Duration(seconds: 2), () {
+      if (entry.mounted) {
+        entry.remove();
+      }
+      if (identical(_overlayMessage, entry)) {
+        _overlayMessage = null;
+      }
+    });
   }
 
   String _statusLabel(bool? value) {

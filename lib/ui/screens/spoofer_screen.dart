@@ -41,7 +41,7 @@ class SpooferScreen extends StatefulWidget {
 }
 
 class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserver {
-  final TextEditingController _routeController = TextEditingController(text: _samplePolyline);
+  final TextEditingController _routeController = TextEditingController();
 
   GoogleMapController? _mapController;
   bool _pendingFitRoute = false;
@@ -484,6 +484,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                controller.text = _samplePolyline;
+                _routeController.text = _samplePolyline;
+                Navigator.of(context).pop();
+                _loadRouteFromInput();
+              },
+              child: const Text('Demo'),
             ),
             FilledButton(
               onPressed: () {
@@ -980,6 +989,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _startPlayback();
     }
   }
+
 
   void _startPlayback() {
     if (!_route.hasRoute || _route.totalDistanceMeters == 0) {

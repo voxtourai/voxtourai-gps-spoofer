@@ -1461,7 +1461,16 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    final colors = Theme.of(context).colorScheme;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: colors.onInverseSurface)),
+        backgroundColor: colors.inverseSurface.withOpacity(0.92),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   void _showOverlayMessage(String message) {
@@ -1529,7 +1538,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _lastMessageId = message.id;
     switch (message.type) {
       case UiMessageType.snack:
-        _showSnack(message.message);
+        _showOverlayMessage(message.message);
         break;
       case UiMessageType.overlay:
         _showOverlayMessage(message.message);

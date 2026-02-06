@@ -356,18 +356,32 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     Positioned(
                       right: 12,
                       bottom: overlayBottom,
-                      child: FloatingActionButton.small(
-                        heroTag: 'recenter',
-                        onPressed: _mapState.currentPosition == null
-                            ? null
-                            : () {
-                                _mapState.setAutoFollow(true);
-                                _followCamera(_mapState.currentPosition!);
-                              },
-                        tooltip: 'Recenter',
-                        child: Icon(
-                          _mapState.autoFollow ? Icons.my_location : Icons.center_focus_strong,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasRoute) ...[
+                            FloatingActionButton.small(
+                              heroTag: 'fitRoute',
+                              onPressed: _fitRouteToMap,
+                              tooltip: 'Fit route',
+                              child: const Icon(Icons.fit_screen),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          FloatingActionButton.small(
+                            heroTag: 'recenter',
+                            onPressed: _mapState.currentPosition == null
+                                ? null
+                                : () {
+                                    _mapState.setAutoFollow(true);
+                                    _followCamera(_mapState.currentPosition!);
+                                  },
+                            tooltip: 'Recenter',
+                            child: Icon(
+                              _mapState.autoFollow ? Icons.my_location : Icons.center_focus_strong,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (_waypoints.selectedIndex != null)
@@ -452,55 +466,82 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     await showDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-          titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          title: Text(
-            'Load route',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16),
-          ),
-          content: TextField(
-            controller: controller,
-            minLines: 3,
-            maxLines: 6,
-            decoration: const InputDecoration(
-              hintText: 'Paste encoded polyline or Routes API JSON',
-              border: OutlineInputBorder(),
-              isDense: true,
-              contentPadding: EdgeInsets.fromLTRB(12, 10, 12, 10),
-            ),
-          ),
-          actions: [
-            IconButton(
-              tooltip: 'Clear',
-              icon: const Icon(Icons.delete_outline),
-              onPressed: controller.clear,
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                controller.text = _samplePolyline;
-                controller.selection = TextSelection.collapsed(
-                  offset: controller.text.length,
-                );
-                _messages.showOverlay('Filled demo route.');
-              },
-              child: const Text('Demo'),
-            ),
-            FilledButton(
-              onPressed: () {
-                _routeController.text = controller.text;
-                Navigator.of(context).pop();
-                _loadRouteFromInput();
-              },
-              child: const Text('Load'),
-            ),
-          ],
+        return ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            final trimmed = value.text.trim();
+            final isEmpty = trimmed.isEmpty;
+            return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              title: Text(
+                'Load route',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      hintText: 'Paste encoded polyline or Routes API JSON',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    ),
+                  ),
+                  if (isEmpty) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Input required to load a route.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                IconButton(
+                  tooltip: 'Clear',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: controller.clear,
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    controller.text = _samplePolyline;
+                    controller.selection = TextSelection.collapsed(
+                      offset: controller.text.length,
+                    );
+                    _messages.showOverlay('Filled demo route.');
+                  },
+                  child: const Text('Demo'),
+                ),
+                FilledButton(
+                  onPressed: isEmpty
+                      ? null
+                      : () {
+                          _routeController.text = controller.text;
+                          Navigator.of(context).pop();
+                          _loadRouteFromInput();
+                        },
+                  child: const Text('Load'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

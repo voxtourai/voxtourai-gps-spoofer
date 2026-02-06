@@ -14,6 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../controllers/mock_location_controller.dart';
+import '../../controllers/map_state_controller.dart';
 import '../../controllers/playback_controller.dart';
 import '../../controllers/preferences_controller.dart';
 import '../../controllers/route_controller.dart';
@@ -44,16 +45,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final TextEditingController _routeController = TextEditingController();
 
   GoogleMapController? _mapController;
-  bool _pendingFitRoute = false;
-  bool _autoFollow = true;
-  bool _isProgrammaticMove = false;
-  bool? _lastMapStyleDark;
+  final MapStateController _mapState = MapStateController();
 
   final RouteController _route = RouteController();
-
-  LatLng? _currentPosition;
-  Set<Polyline> _polylines = const {};
-  Set<Marker> _markers = const {};
 
   final PlaybackController _playback = PlaybackController();
   final SettingsController _settings = SettingsController();
@@ -66,9 +60,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _startupChecksRunning = false;
   Map<String, Object?>? _lastMockStatus;
   String? _selectedMockApp;
-  LatLng? _lastInjectedPosition;
   final WaypointController _waypoints = WaypointController();
-  Set<Marker> _customMarkers = const {};
   bool _backgroundNotificationShown = false;
   final List<String> _debugLog = [];
   String? _lastDebugMessage;
@@ -169,6 +161,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _overlayMessage = null;
     _playback.dispose();
     _route.dispose();
+    _mapState.dispose();
     _waypoints.dispose();
     _settings.dispose();
     unawaited(_cancelBackgroundNotification());
@@ -246,7 +239,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_route, _waypoints, _playback, _settings]),
+      animation: Listenable.merge([_route, _waypoints, _playback, _settings, _mapState]),
       builder: (context, _) {
         final hasRoute = _route.hasRoute;
         final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -287,41 +280,35 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                   children: [
                     Listener(
                       onPointerDown: (_) {
-                        if (_autoFollow) {
-                          setState(() {
-                            _autoFollow = false;
-                          });
+                        if (_mapState.autoFollow) {
+                          _mapState.setAutoFollow(false);
                         }
                       },
                       child: GoogleMap(
                         key: ValueKey('map-${_hasLocationPermission == true ? 'loc-on' : 'loc-off'}'),
                         initialCameraPosition: CameraPosition(
-                          target: _currentPosition ?? const LatLng(0, 0),
-                          zoom: _currentPosition == null ? 2 : 16,
+                          target: _mapState.currentPosition ?? const LatLng(0, 0),
+                          zoom: _mapState.currentPosition == null ? 2 : 16,
                         ),
                         onMapCreated: _onMapCreated,
                         onCameraMoveStarted: () {
-                          if (_isProgrammaticMove) {
+                          if (_mapState.isProgrammaticMove) {
                             return;
                           }
-                          if (_autoFollow) {
-                            setState(() {
-                              _autoFollow = false;
-                            });
+                          if (_mapState.autoFollow) {
+                            _mapState.setAutoFollow(false);
                           }
                         },
                         onCameraIdle: () {
-                          if (_isProgrammaticMove) {
-                            _isProgrammaticMove = false;
+                          if (_mapState.isProgrammaticMove) {
+                            _mapState.setProgrammaticMove(false);
                           }
                         },
                         onTap: (position) {
                           if (_waypoints.selectedIndex != null) {
                             _waypoints.setSelectedIndex(null);
-                            setState(() {
-                              _rebuildCustomMarkers();
-                              _refreshMarkers();
-                            });
+                            _rebuildCustomMarkers();
+                            _refreshMarkers();
                             return;
                           }
                           if (_route.hasPoints || _waypoints.hasPoints) {
@@ -336,8 +323,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           }
                           _addCustomPoint(position);
                         },
-                        markers: _markers,
-                        polylines: _polylines,
+                        markers: _mapState.markers,
+                        polylines: _mapState.polylines,
                         mapToolbarEnabled: false,
                         padding: EdgeInsets.only(
                           bottom: bottomInset + 56,
@@ -367,16 +354,16 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                       bottom: overlayBottom,
                       child: FloatingActionButton.small(
                         heroTag: 'recenter',
-                        onPressed: _currentPosition == null
+                        onPressed: _mapState.currentPosition == null
                             ? null
                             : () {
-                                setState(() {
-                                  _autoFollow = true;
-                                });
-                                _followCamera(_currentPosition!);
+                                _mapState.setAutoFollow(true);
+                                _followCamera(_mapState.currentPosition!);
                               },
                         tooltip: 'Recenter',
-                        child: Icon(_autoFollow ? Icons.my_location : Icons.center_focus_strong),
+                        child: Icon(
+                          _mapState.autoFollow ? Icons.my_location : Icons.center_focus_strong,
+                        ),
                       ),
                     ),
                     if (_waypoints.selectedIndex != null)
@@ -543,15 +530,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _clearRoute() {
     _stopPlayback();
-    setState(() {
-      _route.clear();
-      _polylines = const {};
-      _waypoints.clear();
-      _customMarkers = const {};
-      _markers = const {};
-      _currentPosition = null;
-      _lastInjectedPosition = null;
-    });
+    _route.clear();
+    _waypoints.clear();
+    _mapState.clearRouteState();
   }
 
   void _appendDebugLog(String message) {
@@ -689,7 +670,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           Text('Debug', style: theme.textTheme.labelLarge),
           const SizedBox(height: 4),
           Text(
-            'Injected: ${_lastInjectedPosition == null ? '—' : '${_lastInjectedPosition!.latitude.toStringAsFixed(6)}, ${_lastInjectedPosition!.longitude.toStringAsFixed(6)}'}',
+            'Injected: ${_mapState.lastInjectedPosition == null ? '—' : '${_mapState.lastInjectedPosition!.latitude.toStringAsFixed(6)}, ${_mapState.lastInjectedPosition!.longitude.toStringAsFixed(6)}'}',
             style: theme.textTheme.bodySmall,
           ),
           Text(
@@ -827,9 +808,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    _lastMapStyleDark = null;
+    _mapState.setLastMapStyleDark(null);
     unawaited(_applyMapStyle());
-    if (_pendingFitRoute) {
+    if (_mapState.pendingFitRoute) {
       _fitRouteToMap();
     }
   }
@@ -839,10 +820,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     final useDarkStyle = _shouldUseDarkMapStyle();
-    if (_lastMapStyleDark == useDarkStyle) {
+    if (_mapState.lastMapStyleDark == useDarkStyle) {
       return;
     }
-    _lastMapStyleDark = useDarkStyle;
+    _mapState.setLastMapStyleDark(useDarkStyle);
     await _mapController!.setMapStyle(useDarkStyle ? darkMapStyle : null);
   }
 
@@ -898,7 +879,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         return;
       }
       _waypoints.clear();
-      _customMarkers = const {};
+      _mapState.setCustomMarkers(const {});
       _setRoute(points);
       _fitRouteToMap();
     } catch (error) {
@@ -980,14 +961,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _setRoute(List<LatLng> points) {
     _route.setRoute(points);
-    _polylines = {
+    _mapState.setPolylines({
       Polyline(
         polylineId: const PolylineId('route'),
         color: Colors.blueAccent,
         width: 4,
         points: _route.points,
       ),
-    };
+    });
     _setProgress(0);
   }
 
@@ -1051,11 +1032,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _route.setProgress(clamped);
     final position = _route.positionForCurrentProgress() ?? _route.points.first;
 
-    setState(() {
-      _currentPosition = position;
-      _lastInjectedPosition = position;
-      _refreshMarkers();
-    });
+    _mapState.setCurrentPosition(position, updateLastInjected: true);
+    _refreshMarkers();
 
     unawaited(_sendMockLocation(position));
     _followCamera(position);
@@ -1069,15 +1047,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _clearRoute();
     }
     _stopPlayback();
-    setState(() {
-      _currentPosition = position;
-      _lastInjectedPosition = position;
-      _autoFollow = true;
-      _refreshMarkers();
-    });
+    _mapState.setCurrentPosition(position, updateLastInjected: true);
+    _mapState.setAutoFollow(true);
+    _refreshMarkers();
     unawaited(_sendMockLocation(position));
     if (_mapController != null) {
-      _isProgrammaticMove = true;
+      _mapState.setProgrammaticMove(true);
       final update = zoom == null ? CameraUpdate.newLatLng(position) : CameraUpdate.newLatLngZoom(position, zoom);
       _mapController!.animateCamera(update);
       return;
@@ -1087,27 +1062,28 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _refreshMarkers() {
     final markers = <Marker>{};
-    if (_settings.showMockMarker && _currentPosition != null) {
+    final currentPosition = _mapState.currentPosition;
+    if (_settings.showMockMarker && currentPosition != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('current'),
-          position: _currentPosition!,
+          position: currentPosition,
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: const InfoWindow(title: 'Mocked GPS'),
           zIndex: 1,
         ),
       );
     }
-    markers.addAll(_customMarkers);
-    _markers = markers;
+    markers.addAll(_mapState.customMarkers);
+    _mapState.setMarkers(markers);
   }
 
   void _rebuildCustomMarkers() {
     if (_waypoints.points.isEmpty) {
-      _customMarkers = const {};
+      _mapState.setCustomMarkers(const {});
       return;
     }
-    _customMarkers = {
+    _mapState.setCustomMarkers({
       for (var i = 0; i < _waypoints.points.length; i++)
         Marker(
           markerId: MarkerId('wp_$i'),
@@ -1131,41 +1107,32 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           ),
           zIndex: 2,
         ),
-    };
+    });
   }
 
   void _rebuildCustomRoute() {
     _rebuildCustomMarkers();
     if (_waypoints.points.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _route.clear();
-          _polylines = const {};
-          _currentPosition = null;
-          _lastInjectedPosition = null;
-          _refreshMarkers();
-        });
-      } else {
-        _route.clear();
-        _polylines = const {};
-        _currentPosition = null;
-        _lastInjectedPosition = null;
-        _refreshMarkers();
-      }
+      _route.clear();
+      _mapState.setPolylines(const {});
+      _mapState.setCurrentPosition(null, updateLastInjected: true);
+      _refreshMarkers();
       return;
     }
 
     _route.setRoute(List<LatLng>.from(_waypoints.points));
-    _polylines = _route.hasRoute
-        ? {
-            Polyline(
-              polylineId: const PolylineId('route'),
-              color: Colors.blueAccent,
-              width: 4,
-              points: _route.points,
-            ),
-          }
-        : const {};
+    _mapState.setPolylines(
+      _route.hasRoute
+          ? {
+              Polyline(
+                polylineId: const PolylineId('route'),
+                color: Colors.blueAccent,
+                width: 4,
+                points: _route.points,
+              ),
+            }
+          : const {},
+    );
     _setProgress(0);
   }
 
@@ -1187,11 +1154,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _selectCustomPoint(int index) {
-    setState(() {
-      _waypoints.setSelectedIndex(index);
-      _rebuildCustomMarkers();
-      _refreshMarkers();
-    });
+    _waypoints.setSelectedIndex(index);
+    _rebuildCustomMarkers();
+    _refreshMarkers();
   }
 
   Future<void> _saveCustomRoute() async {
@@ -1509,22 +1474,22 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _followCamera(LatLng position) {
-    if (_mapController == null || !_autoFollow) {
+    if (_mapController == null || !_mapState.autoFollow) {
       return;
     }
-    _isProgrammaticMove = true;
+    _mapState.setProgrammaticMove(true);
     _mapController!.moveCamera(CameraUpdate.newLatLng(position));
   }
 
   void _fitRouteToMap() {
     if (_mapController == null) {
-      _pendingFitRoute = true;
+      _mapState.setPendingFitRoute(true);
       return;
     }
     if (!_route.hasPoints) {
       return;
     }
-    _pendingFitRoute = false;
+    _mapState.setPendingFitRoute(false);
 
     if (_route.points.length == 1) {
       _mapController!.moveCamera(CameraUpdate.newLatLngZoom(_route.points.first, 16));
@@ -1951,7 +1916,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               showMockMarker = value;
                             });
                             _settings.setShowMockMarker(value);
-                            setState(_refreshMarkers);
+                            _refreshMarkers();
                           },
                         ),
                         ListTile(
@@ -2052,12 +2017,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               _showSnack('Real location not available yet.');
                               return;
                             }
-                            setState(() {
-                              _currentPosition = location;
-                              _lastInjectedPosition = null;
-                              _refreshMarkers();
-                              _autoFollow = true;
-                            });
+                            _mapState.setCurrentPosition(location);
+                            _mapState.setLastInjectedPosition(null);
+                            _mapState.setAutoFollow(true);
+                            _refreshMarkers();
                             _followCamera(location);
                           },
                           icon: const Icon(Icons.location_off),

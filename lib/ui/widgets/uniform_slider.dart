@@ -1,7 +1,45 @@
 import 'package:flutter/material.dart';
 
-class UniformTrackShape extends SliderTrackShape with BaseSliderTrackShape {
-  const UniformTrackShape();
+class UniformSlider extends StatelessWidget {
+  const UniformSlider({
+    super.key,
+    required this.value,
+    required this.min,
+    required this.max,
+    this.divisions,
+    this.onChanged,
+    this.theme,
+  });
+
+  final double value;
+  final double min;
+  final double max;
+  final int? divisions;
+  final ValueChanged<double>? onChanged;
+  final SliderThemeData? theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseTheme = theme ?? SliderTheme.of(context);
+    final sliderTheme = baseTheme.copyWith(
+      trackShape: const _UniformTrackShape(),
+    );
+
+    return SliderTheme(
+      data: sliderTheme,
+      child: Slider(
+        value: value,
+        min: min,
+        max: max,
+        divisions: divisions,
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _UniformTrackShape extends SliderTrackShape with BaseSliderTrackShape {
+  const _UniformTrackShape();
 
   @override
   void paint(

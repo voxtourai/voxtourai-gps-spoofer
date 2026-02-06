@@ -19,7 +19,7 @@ import '../../controllers/mock_location_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../models/help_section.dart';
 import '../map/map_style.dart';
-import '../widgets/uniform_track_shape.dart';
+import '../widgets/uniform_slider.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
 
@@ -486,7 +486,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final speedSliderTheme = sliderTheme.copyWith(
       activeTrackColor: theme.colorScheme.outlineVariant,
       inactiveTrackColor: theme.colorScheme.outlineVariant,
-      trackShape: const UniformTrackShape(),
     );
 
     return Container(
@@ -546,19 +545,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     ),
                   ],
                 ),
-                SliderTheme(
-                  data: speedSliderTheme,
-                  child: Slider(
-                    value: _speedMps,
-                    min: -200,
-                    max: 200,
-                    divisions: 200,
-                    onChanged: (value) {
-                      setState(() {
-                        _speedMps = value;
-                      });
-                    },
-                  ),
+                UniformSlider(
+                  theme: speedSliderTheme,
+                  value: _speedMps,
+                  min: -200,
+                  max: 200,
+                  divisions: 200,
+                  onChanged: (value) {
+                    setState(() {
+                      _speedMps = value;
+                    });
+                  },
                 ),
               ],
             ),

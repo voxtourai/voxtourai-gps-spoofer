@@ -22,7 +22,9 @@ import '../../controllers/theme_controller.dart';
 import '../../controllers/waypoint_controller.dart';
 import '../../models/help_section.dart';
 import '../map/map_style.dart';
-import '../widgets/uniform_slider.dart';
+import '../widgets/controls_panel.dart';
+import '../widgets/map_action_buttons.dart';
+import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
 
@@ -347,34 +349,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     Positioned(
                       right: 12,
                       top: 12,
-                      child: Column(
-                        children: [
-                          FloatingActionButton.small(
-                            heroTag: 'load',
-                            onPressed: _route.hasPoints ? _clearRoute : _openRouteInputSheet,
-                            tooltip: _route.hasPoints ? 'Clear route' : 'Load route',
-                            child: Icon(_route.hasPoints ? Icons.close : Icons.upload),
-                          ),
-                          const SizedBox(height: 8),
-                          FloatingActionButton.small(
-                            heroTag: 'play',
-                            onPressed: hasRoute ? _togglePlayback : null,
-                            backgroundColor: hasRoute ? null : Theme.of(context).colorScheme.surfaceVariant,
-                            foregroundColor:
-                                hasRoute ? null : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.6),
-                            tooltip: _playback.isPlaying ? 'Pause' : 'Play',
-                            child: Icon(_playback.isPlaying ? Icons.pause : Icons.play_arrow),
-                          ),
-                          if (_waypoints.usingCustomRoute && _waypoints.hasPoints) ...[
-                            const SizedBox(height: 8),
-                            FloatingActionButton.small(
-                              heroTag: 'waypoints',
-                              onPressed: _openWaypointList,
-                              tooltip: 'Waypoints',
-                              child: const Icon(Icons.list_alt),
-                            ),
-                          ],
-                        ],
+                      child: MapActionButtons(
+                        hasRoute: hasRoute,
+                        hasPoints: _route.hasPoints,
+                        isPlaying: _playback.isPlaying,
+                        showWaypoints: _waypoints.usingCustomRoute && _waypoints.hasPoints,
+                        onLoadOrClear: _route.hasPoints ? _clearRoute : _openRouteInputSheet,
+                        onTogglePlayback: hasRoute ? _togglePlayback : null,
+                        onOpenWaypoints: _openWaypointList,
                       ),
                     ),
                     Positioned(
@@ -399,40 +381,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         left: 12,
                         right: 72,
                         bottom: overlayBottom,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: () {
-                                  final idx = _waypoints.selectedIndex;
-                                  if (idx != null) {
-                                    _renameCustomPoint(idx);
-                                  }
-                                },
-                                icon: const Icon(Icons.edit),
-                                label: const Text('Rename'),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: () {
-                                  final idx = _waypoints.selectedIndex;
-                                  if (idx != null) {
-                                    _removeCustomPoint(idx);
-                                  }
-                                },
-                                icon: const Icon(Icons.delete),
-                                label: const Text('Delete'),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: WaypointActionRow(
+                          onRename: () {
+                            final idx = _waypoints.selectedIndex;
+                            if (idx != null) {
+                              _renameCustomPoint(idx);
+                            }
+                          },
+                          onDelete: () {
+                            final idx = _waypoints.selectedIndex;
+                            if (idx != null) {
+                              _removeCustomPoint(idx);
+                            }
+                          },
                         ),
                       ),
                   ],
@@ -461,7 +422,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Widget _buildControls(BuildContext context) {
-    final theme = Theme.of(context);
     final bool hasRoute = _route.hasRoute;
     if (!hasRoute) {
       return const SizedBox.shrink();
@@ -470,98 +430,25 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final distanceLabel = _route.totalDistanceMeters > 0
         ? '${_formatDistance(_route.progressDistance)} / ${_formatDistance(_route.totalDistanceMeters)}'
         : '0 m';
-    final sliderTheme = SliderTheme.of(context).copyWith(
-      trackHeight: 3,
-      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
-      overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-    );
-    final speedSliderTheme = sliderTheme.copyWith(
-      activeTrackColor: theme.colorScheme.outlineVariant,
-      inactiveTrackColor: theme.colorScheme.outlineVariant,
-    );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 4),
-            if (_settings.showSetupBar)
-              OutlinedButton.icon(
-                onPressed: () => _runStartupChecks(showDialogs: true),
-                icon: const Icon(Icons.check_circle_outline),
-                label: Text(
-                  'Setup: '
-                  'location ${_statusLabel(_hasLocationPermission)} · '
-                  'dev ${_statusLabel(_isDeveloperModeEnabled)} · '
-                  'mock ${_statusLabel(_isMockLocationApp)}',
-                ),
-              ),
-            const SizedBox(height: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Progress', style: Theme.of(context).textTheme.labelMedium),
-                    Text(
-                      '$progressLabel · $distanceLabel',
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ],
-                ),
-                SliderTheme(
-                  data: sliderTheme,
-                  child: Slider(
-                    value: _clamp01(_route.progress),
-                    min: 0,
-                    max: 1,
-                    onChanged: hasRoute
-                        ? (value) {
-                            _playback.markTick();
-                            _setProgress(value);
-                          }
-                        : null,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Speed', style: Theme.of(context).textTheme.labelMedium),
-                    Text(
-                      '${_playback.speedMps.toStringAsFixed(0)} m/s',
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ],
-                ),
-                UniformSlider(
-                  theme: speedSliderTheme,
-                  value: _playback.speedMps,
-                  min: -200,
-                  max: 200,
-                  divisions: 200,
-                  onChanged: (value) {
-                    _playback.speedMps = value;
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            if (_mockError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  _mockError!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.redAccent),
-                ),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+    return ControlsPanel(
+      showSetupBar: _settings.showSetupBar,
+      setupLabel: 'Setup: '
+          'location ${_statusLabel(_hasLocationPermission)} · '
+          'dev ${_statusLabel(_isDeveloperModeEnabled)} · '
+          'mock ${_statusLabel(_isMockLocationApp)}',
+      onRunSetupChecks: () => _runStartupChecks(showDialogs: true),
+      progressLabel: progressLabel,
+      distanceLabel: distanceLabel,
+      progress: _clamp01(_route.progress),
+      onProgressChanged: hasRoute
+          ? (value) {
+              _playback.markTick();
+              _setProgress(value);
+            }
+          : null,
+      speedMps: _playback.speedMps,
+      onSpeedChanged: (value) => _playback.speedMps = value,
+      mockError: _mockError,
     );
   }
 

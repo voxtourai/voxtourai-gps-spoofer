@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../controllers/mock_location_controller.dart';
+import '../widgets/search_scaffold.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -102,66 +103,42 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Search'),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: TextField(
-                controller: _controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search places',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searching
-                      ? const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton(
-                          icon: const Icon(Icons.arrow_forward),
-                          onPressed: () => _runSearch(_controller.text),
-                        ),
-                  border: const OutlineInputBorder(),
-                ),
-                textInputAction: TextInputAction.search,
-                onSubmitted: (value) => _runSearch(value),
+    return SearchScaffold(
+      title: 'Search',
+      controller: _controller,
+      hintText: 'Search places',
+      autofocus: true,
+      suffixIcon: _searching
+          ? const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
+            )
+          : IconButton(
+              icon: const Icon(Icons.arrow_forward),
+              onPressed: () => _runSearch(_controller.text),
             ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(_error!, style: Theme.of(context).textTheme.bodySmall),
-              ),
-            Expanded(
-              child: _results.isEmpty
-                  ? const Center(child: Text('No results yet.'))
-                  : ListView.separated(
-                      itemCount: _results.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final item = _results[index];
-                        return ListTile(
-                          title: Text(item.address),
-                          onTap: () {
-                            widget.onSelect(item.location, item.suggestedZoom);
-                            Navigator.of(context).pop();
-                          },
-                        );
-                      },
-                    ),
+      onSubmitted: (value) => _runSearch(value),
+      helper: _error == null ? null : Text(_error!, style: Theme.of(context).textTheme.bodySmall),
+      body: _results.isEmpty
+          ? const Center(child: Text('No results yet.'))
+          : ListView.separated(
+              itemCount: _results.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final item = _results[index];
+                return ListTile(
+                  title: Text(item.address),
+                  onTap: () {
+                    widget.onSelect(item.location, item.suggestedZoom);
+                    Navigator.of(context).pop();
+                  },
+                );
+              },
             ),
-          ],
-        ),
-      ),
     );
   }
 }

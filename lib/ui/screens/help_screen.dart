@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/help_section.dart';
+import '../widgets/search_scaffold.dart';
 
 class HelpScreen extends StatefulWidget {
   const HelpScreen({super.key, required this.helpSections});
@@ -34,53 +35,34 @@ class _HelpScreenState extends State<HelpScreen> {
       return section.items.any((item) => item.toLowerCase().contains(query));
     }).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Help'),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: TextField(
-                controller: _controller,
-                decoration: const InputDecoration(
-                  hintText: 'Search help...',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _query = value;
-                  });
-                },
-              ),
-            ),
-            Expanded(
-              child: sections.isEmpty
-                  ? const Center(child: Text('No matching help topics.'))
-                  : ListView.builder(
-                      itemCount: sections.length,
-                      itemBuilder: (context, index) {
-                        final section = sections[index];
-                        final body = section.items.map((item) => '- $item').join('\n');
-                        return ExpansionTile(
-                          title: Text(section.title),
-                          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          children: [
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(body),
-                            ),
-                          ],
-                        );
-                      },
+    return SearchScaffold(
+      title: 'Help',
+      controller: _controller,
+      hintText: 'Search help...',
+      onChanged: (value) {
+        setState(() {
+          _query = value;
+        });
+      },
+      body: sections.isEmpty
+          ? const Center(child: Text('No matching help topics.'))
+          : ListView.builder(
+              itemCount: sections.length,
+              itemBuilder: (context, index) {
+                final section = sections[index];
+                final body = section.items.map((item) => '- $item').join('\n');
+                return ExpansionTile(
+                  title: Text(section.title),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(body),
                     ),
+                  ],
+                );
+              },
             ),
-          ],
-        ),
-      ),
     );
   }
 }

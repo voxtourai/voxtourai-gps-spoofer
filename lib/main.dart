@@ -1289,12 +1289,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _refreshMarkers();
     });
     unawaited(_sendMockLocation(position));
-    if (zoom != null && _mapController != null) {
+    if (_mapController != null) {
       _isProgrammaticMove = true;
-      _mapController!.animateCamera(CameraUpdate.newLatLngZoom(position, zoom));
-    } else {
-      _followCamera(position);
+      final update = zoom == null ? CameraUpdate.newLatLng(position) : CameraUpdate.newLatLngZoom(position, zoom);
+      _mapController!.animateCamera(update);
+      return;
     }
+    _followCamera(position);
   }
 
   void _refreshMarkers() {

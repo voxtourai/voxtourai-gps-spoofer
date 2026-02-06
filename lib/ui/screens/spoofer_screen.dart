@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/playback_controller.dart';
 import '../../controllers/route_controller.dart';
+import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../controllers/waypoint_controller.dart';
 import '../../models/help_section.dart';
@@ -24,13 +25,6 @@ import '../map/map_style.dart';
 import '../widgets/uniform_slider.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
-
-enum DarkModeSetting {
-  on,
-  uiOnly,
-  mapOnly,
-  off,
-}
 
 const String _tosAcceptedKey = 'tos_accepted_v1';
 const String _savedRoutesKey = 'saved_custom_routes_v1';
@@ -62,6 +56,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Set<Marker> _markers = const {};
 
   final PlaybackController _playback = PlaybackController();
+  final SettingsController _settings = SettingsController();
   String? _mockError;
   DateTime? _lastMockErrorAt;
   bool? _hasLocationPermission;
@@ -73,11 +68,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   LatLng? _lastInjectedPosition;
   final WaypointController _waypoints = WaypointController();
   Set<Marker> _customMarkers = const {};
-  bool _showMockMarker = false;
-  bool _showSetupBar = false;
-  bool _showDebugPanel = false;
-  bool _backgroundEnabled = false;
-  bool _backgroundBusy = false;
   bool _backgroundNotificationShown = false;
   final List<String> _debugLog = [];
   String? _lastDebugMessage;
@@ -86,7 +76,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
   bool _tosAccepted = false;
-  DarkModeSetting _darkModeSetting = DarkModeSetting.on;
   PackageInfo? _packageInfo;
   bool _packageInfoLoading = false;
   int _titleTapCount = 0;
@@ -177,6 +166,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _playback.dispose();
     _route.dispose();
     _waypoints.dispose();
+    _settings.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
@@ -184,7 +174,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_backgroundEnabled) {
+    if (_settings.backgroundEnabled) {
       if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
         unawaited(_showBackgroundNotification());
       } else if (state == AppLifecycleState.resumed) {
@@ -252,7 +242,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_route, _waypoints, _playback]),
+      animation: Listenable.merge([_route, _waypoints, _playback, _settings]),
       builder: (context, _) {
         final hasRoute = _route.hasRoute;
         final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -498,7 +488,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 4),
-            if (_showSetupBar)
+            if (_settings.showSetupBar)
               OutlinedButton.icon(
                 onPressed: () => _runStartupChecks(showDialogs: true),
                 icon: const Icon(Icons.check_circle_outline),
@@ -780,6 +770,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Widget _buildDebugPanel(BuildContext context) {
     final status = _lastMockStatus;
     final theme = Theme.of(context);
+    if (!_settings.showDebugPanel) {
+      return const SizedBox.shrink();
+    }
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -886,9 +879,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return false;
     }
 
-    setState(() {
-      _backgroundBusy = true;
-    });
+    _settings.setBackgroundBusy(true);
 
     try {
       if (enabled) {
@@ -913,16 +904,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           _showSnack('Failed to enable background mode.');
           return false;
         }
-        setState(() {
-          _backgroundEnabled = true;
-        });
+        _settings.setBackgroundEnabled(true);
         _showSnack('Background mode enabled. Keep playback running to spoof.');
         return true;
       } else {
         await FlutterBackground.disableBackgroundExecution();
-        setState(() {
-          _backgroundEnabled = false;
-        });
+        _settings.setBackgroundEnabled(false);
         unawaited(_cancelBackgroundNotification());
         return true;
       }
@@ -930,11 +917,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _showSnack('Background mode error: $error');
       return false;
     } finally {
-      if (mounted) {
-        setState(() {
-          _backgroundBusy = false;
-        });
-      }
+      _settings.setBackgroundBusy(false);
     }
   }
 
@@ -960,7 +943,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   bool _shouldUseDarkMapStyle() {
-    switch (_darkModeSetting) {
+    switch (_settings.darkModeSetting) {
       case DarkModeSetting.on:
         return scheduler.SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
       case DarkModeSetting.uiOnly:
@@ -973,7 +956,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _applyDarkModeSetting(DarkModeSetting setting) {
-    _darkModeSetting = setting;
+    _settings.setDarkModeSetting(setting);
     switch (setting) {
       case DarkModeSetting.on:
         themeController.mode.value = ThemeMode.system;
@@ -1199,7 +1182,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _refreshMarkers() {
     final markers = <Marker>{};
-    if (_showMockMarker && _currentPosition != null) {
+    if (_settings.showMockMarker && _currentPosition != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('current'),
@@ -1923,12 +1906,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (!mounted) {
       return;
     }
-    var showSetupBar = _showSetupBar;
-    var showDebugPanel = _showDebugPanel;
-    var showMockMarker = _showMockMarker;
-    var backgroundEnabled = _backgroundEnabled;
-    var backgroundBusy = _backgroundBusy;
-    var darkModeSetting = _darkModeSetting;
+    var showSetupBar = _settings.showSetupBar;
+    var showDebugPanel = _settings.showDebugPanel;
+    var showMockMarker = _settings.showMockMarker;
+    var backgroundEnabled = _settings.backgroundEnabled;
+    var backgroundBusy = _settings.backgroundBusy;
+    var darkModeSetting = _settings.darkModeSetting;
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -2004,9 +1987,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showSetupBar = value;
                             });
-                            setState(() {
-                              _showSetupBar = value;
-                            });
+                            _settings.setShowSetupBar(value);
                           },
                         ),
                         buildToggle(
@@ -2016,9 +1997,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showDebugPanel = value;
                             });
-                            setState(() {
-                              _showDebugPanel = value;
-                            });
+                            _settings.setShowDebugPanel(value);
                           },
                         ),
                         buildToggle(
@@ -2028,10 +2007,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showMockMarker = value;
                             });
-                            setState(() {
-                              _showMockMarker = value;
-                              _refreshMarkers();
-                            });
+                            _settings.setShowMockMarker(value);
+                            setState(_refreshMarkers);
                           },
                         ),
                         ListTile(
@@ -2050,11 +2027,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                   backgroundEnabled = value;
                                   backgroundBusy = true;
                                 });
+                                _settings.setBackgroundBusy(true);
                                 final ok = await _setBackgroundMode(value);
                                 setModalState(() {
                                   backgroundBusy = false;
-                                  backgroundEnabled = _backgroundEnabled;
+                                  backgroundEnabled = _settings.backgroundEnabled;
                                 });
+                                _settings.setBackgroundBusy(false);
                                 if (!ok) {
                                   // snack handled in _setBackgroundMode
                                 }
@@ -2070,11 +2049,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               backgroundEnabled = next;
                               backgroundBusy = true;
                             });
+                            _settings.setBackgroundBusy(true);
                             final ok = await _setBackgroundMode(next);
                             setModalState(() {
                               backgroundBusy = false;
-                              backgroundEnabled = _backgroundEnabled;
+                              backgroundEnabled = _settings.backgroundEnabled;
                             });
+                            _settings.setBackgroundBusy(false);
                             if (!ok) {
                               // snack handled in _setBackgroundMode
                             }
@@ -2104,9 +2085,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                 setModalState(() {
                                   darkModeSetting = value;
                                 });
-                                setState(() {
-                                  _applyDarkModeSetting(value);
-                                });
+                                _applyDarkModeSetting(value);
                               },
                             ),
                           ),

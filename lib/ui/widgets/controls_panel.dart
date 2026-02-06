@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'progress_slider.dart';
 import 'uniform_slider.dart';
 
 class ControlsPanel extends StatelessWidget {
@@ -31,12 +32,10 @@ class ControlsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sliderTheme = SliderTheme.of(context).copyWith(
+    final speedSliderTheme = SliderTheme.of(context).copyWith(
       trackHeight: 3,
       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
       overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-    );
-    final speedSliderTheme = sliderTheme.copyWith(
       activeTrackColor: theme.colorScheme.outlineVariant,
       inactiveTrackColor: theme.colorScheme.outlineVariant,
     );
@@ -58,24 +57,11 @@ class ControlsPanel extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Progress', style: Theme.of(context).textTheme.labelMedium),
-                    Text(
-                      '$progressLabel · $distanceLabel',
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ],
-                ),
-                SliderTheme(
-                  data: sliderTheme,
-                  child: Slider(
-                    value: progress,
-                    min: 0,
-                    max: 1,
-                    onChanged: onProgressChanged,
-                  ),
+                ProgressSlider(
+                  progressLabel: progressLabel,
+                  distanceLabel: distanceLabel,
+                  value: progress,
+                  onChanged: onProgressChanged,
                 ),
                 const SizedBox(height: 4),
                 Row(

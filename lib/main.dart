@@ -333,7 +333,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           IconButton(
             tooltip: 'Help',
             icon: const Icon(Icons.help_outline),
-            onPressed: _openHelpSheet,
+            onPressed: _openHelpScreen,
           ),
           IconButton(
             tooltip: 'Settings',
@@ -2421,76 +2421,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
-  Future<void> _openHelpSheet() async {
-    var sheetOpen = true;
-
-    void closeSheet(BuildContext context) {
-      sheetOpen = false;
-      Navigator.of(context).pop();
+  Future<void> _openHelpScreen() async {
+    if (!mounted) {
+      return;
     }
-
-    final sheetFuture = showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: false,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return SafeArea(
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.75,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                        child: Row(
-                          children: [
-                            Text('Help', style: Theme.of(context).textTheme.titleMedium),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () {
-                                FocusScope.of(context).unfocus();
-                                closeSheet(context);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _helpSections.length,
-                          itemBuilder: (context, index) {
-                            final section = _helpSections[index];
-                            final body = section.items.map((item) => '- $item').join('\n');
-                            return ExpansionTile(
-                              title: Text(section.title),
-                              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                              children: [
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(body),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (context) => _HelpScreen(helpSections: _helpSections),
+      ),
     );
-    sheetFuture.whenComplete(() {
-      sheetOpen = false;
-    });
-    await sheetFuture;
   }
 
   Future<void> _openDeveloperSettings() async {
@@ -2768,6 +2707,89 @@ class _SearchScreenState extends State<_SearchScreen> {
                             widget.onSelect(item);
                             Navigator.of(context).pop();
                           },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HelpScreen extends StatefulWidget {
+  const _HelpScreen({required this.helpSections});
+
+  final List<_HelpSection> helpSections;
+
+  @override
+  State<_HelpScreen> createState() => _HelpScreenState();
+}
+
+class _HelpScreenState extends State<_HelpScreen> {
+  final TextEditingController _controller = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final sections = widget.helpSections.where((section) {
+      if (query.isEmpty) {
+        return true;
+      }
+      if (section.title.toLowerCase().contains(query)) {
+        return true;
+      }
+      return section.items.any((item) => item.toLowerCase().contains(query));
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Help'),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: TextField(
+                controller: _controller,
+                decoration: const InputDecoration(
+                  hintText: 'Search help...',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _query = value;
+                  });
+                },
+              ),
+            ),
+            Expanded(
+              child: sections.isEmpty
+                  ? const Center(child: Text('No matching help topics.'))
+                  : ListView.builder(
+                      itemCount: sections.length,
+                      itemBuilder: (context, index) {
+                        final section = sections[index];
+                        final body = section.items.map((item) => '- $item').join('\n');
+                        return ExpansionTile(
+                          title: Text(section.title),
+                          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(body),
+                            ),
+                          ],
                         );
                       },
                     ),

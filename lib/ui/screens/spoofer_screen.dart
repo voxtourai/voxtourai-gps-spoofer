@@ -295,7 +295,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           if (hasRoute) ...[
                             FloatingActionButton.small(
                               heroTag: 'fitRoute',
-                              onPressed: _fitRouteToMap,
+                              onPressed: () {
+                                _fitRouteToMap();
+                                _messages.showOverlay('Map fit to route');
+                              },
                               tooltip: 'Fit route',
                               child: const Icon(Icons.fit_screen),
                             ),
@@ -306,8 +309,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             onPressed: _mapState.currentPosition == null
                                 ? null
                                 : () {
+                                    final wasAutoFollow = _mapState.autoFollow;
                                     _mapState.setAutoFollow(true);
                                     _followCamera(_mapState.currentPosition!);
+                                    if (!wasAutoFollow) {
+                                      _messages.showOverlay('Auto-follow enabled');
+                                    }
                                   },
                             tooltip: 'Recenter',
                             child: Icon(

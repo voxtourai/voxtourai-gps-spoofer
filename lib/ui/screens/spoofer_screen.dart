@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as flutter_local_notifications;
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -17,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/playback_controller.dart';
+import '../../controllers/route_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../models/help_section.dart';
 import '../map/map_style.dart';
@@ -54,10 +54,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _isProgrammaticMove = false;
   bool? _lastMapStyleDark;
 
-  List<LatLng> _routePoints = [];
-  List<double> _cumulativeMeters = [];
-  double _totalDistanceMeters = 0;
-  double _progress = 0;
+  final RouteController _route = RouteController();
 
   LatLng? _currentPosition;
   Set<Polyline> _polylines = const {};
@@ -254,9 +251,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    final hasRoute = _routePoints.length >= 2;
+    final hasRoute = _route.hasRoute;
     final bottomInset = MediaQuery.of(context).padding.bottom;
-    final controlsVisible = _routePoints.length >= 2;
+    final controlsVisible = _route.hasRoute;
     final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
     return Scaffold(
       appBar: AppBar(
@@ -327,13 +324,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         });
                         return;
                       }
-                      if (_routePoints.isNotEmpty || _customPoints.isNotEmpty) {
+                      if (_route.hasPoints || _customPoints.isNotEmpty) {
                         return;
                       }
                       _setManualLocation(position);
                     },
                     onLongPress: (position) {
-                      if (_routePoints.isNotEmpty && !_usingCustomRoute) {
+                      if (_route.hasPoints && !_usingCustomRoute) {
                         _showSnack('Clear the loaded route to add points.');
                         return;
                       }
@@ -359,9 +356,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     children: [
                       FloatingActionButton.small(
                         heroTag: 'load',
-                        onPressed: _routePoints.isEmpty ? _openRouteInputSheet : _clearRoute,
-                        tooltip: _routePoints.isEmpty ? 'Load route' : 'Clear route',
-                        child: Icon(_routePoints.isEmpty ? Icons.upload : Icons.close),
+                        onPressed: _route.hasPoints ? _clearRoute : _openRouteInputSheet,
+                        tooltip: _route.hasPoints ? 'Clear route' : 'Load route',
+                        child: Icon(_route.hasPoints ? Icons.close : Icons.upload),
                       ),
                       const SizedBox(height: 8),
                       FloatingActionButton.small(
@@ -452,7 +449,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               axisAlignment: -1,
               child: FadeTransition(opacity: animation, child: child),
             ),
-            child: _routePoints.length >= 2
+            child: _route.hasRoute
                 ? SafeArea(
                     key: const ValueKey('controls'),
                     top: false,
@@ -467,13 +464,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Widget _buildControls(BuildContext context) {
     final theme = Theme.of(context);
-    final bool hasRoute = _routePoints.length >= 2;
+    final bool hasRoute = _route.hasRoute;
     if (!hasRoute) {
       return const SizedBox.shrink();
     }
-    final progressLabel = '${(_progress * 100).toStringAsFixed(0)}%';
-    final distanceLabel = _totalDistanceMeters > 0
-        ? '${_formatDistance(_progress * _totalDistanceMeters)} / ${_formatDistance(_totalDistanceMeters)}'
+    final progressLabel = '${(_route.progress * 100).toStringAsFixed(0)}%';
+    final distanceLabel = _route.totalDistanceMeters > 0
+        ? '${_formatDistance(_route.progressDistance)} / ${_formatDistance(_route.totalDistanceMeters)}'
         : '0 m';
     final sliderTheme = SliderTheme.of(context).copyWith(
       trackHeight: 3,
@@ -520,7 +517,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                 SliderTheme(
                   data: sliderTheme,
                   child: Slider(
-                    value: _clamp01(_progress),
+                    value: _clamp01(_route.progress),
                     min: 0,
                     max: 1,
                     onChanged: hasRoute
@@ -646,10 +643,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   void _clearRoute() {
     _stopPlayback();
     setState(() {
-      _routePoints = [];
-      _cumulativeMeters = [];
-      _totalDistanceMeters = 0;
-      _progress = 0;
+      _route.clear();
       _polylines = const {};
       _customPoints = [];
       _customMarkers = const {};
@@ -1007,7 +1001,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
 
     try {
-      final points = _decodePolyline(polyline);
+      final points = _route.decodePolyline(polyline);
       if (points.length < 2) {
         _showSnack('Failed to decode polyline.');
         return;
@@ -1097,15 +1091,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _setRoute(List<LatLng> points) {
-    _routePoints = points;
-    _cumulativeMeters = _buildCumulativeMeters(points);
-    _totalDistanceMeters = _cumulativeMeters.isEmpty ? 0 : _cumulativeMeters.last;
+    _route.setRoute(points);
     _polylines = {
       Polyline(
         polylineId: const PolylineId('route'),
         color: Colors.blueAccent,
         width: 4,
-        points: points,
+        points: _route.points,
       ),
     };
     _setProgress(0);
@@ -1120,7 +1112,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _startPlayback() {
-    if (_routePoints.length < 2 || _totalDistanceMeters == 0) {
+    if (!_route.hasRoute || _route.totalDistanceMeters == 0) {
       return;
     }
     _playback.start(_onTick);
@@ -1136,7 +1128,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _onTick() {
-    if (!_playback.isPlaying || _routePoints.length < 2) {
+    if (!_playback.isPlaying || !_route.hasRoute) {
       return;
     }
 
@@ -1146,10 +1138,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
 
     final speedMps = _playback.speedMps;
-    final currentDistance = _progress * _totalDistanceMeters;
+    final currentDistance = _route.progressDistance;
     final nextDistance = currentDistance + speedMps * deltaSeconds;
 
-    if (nextDistance >= _totalDistanceMeters) {
+    if (nextDistance >= _route.totalDistanceMeters) {
       _setProgress(1);
       _stopPlayback();
       return;
@@ -1160,20 +1152,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
 
-    _setProgress(nextDistance / _totalDistanceMeters);
+    _setProgress(nextDistance / _route.totalDistanceMeters);
   }
 
   void _setProgress(double value) {
-    if (_routePoints.isEmpty) {
+    if (!_route.hasPoints) {
       return;
     }
 
     final clamped = _clamp01(value);
-    final distance = _totalDistanceMeters * clamped;
-    final position = _totalDistanceMeters == 0 ? _routePoints.first : _positionAtDistance(distance);
+    _route.setProgress(clamped);
+    final position = _route.positionForCurrentProgress() ?? _route.points.first;
 
     setState(() {
-      _progress = clamped;
       _currentPosition = position;
       _lastInjectedPosition = position;
       _refreshMarkers();
@@ -1184,7 +1175,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _setManualLocation(LatLng position, {bool force = false, double? zoom}) {
-    if (_routePoints.isNotEmpty || _customPoints.isNotEmpty) {
+    if (_route.hasPoints || _customPoints.isNotEmpty) {
       if (!force) {
         return;
       }
@@ -1261,20 +1252,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (_customPoints.isEmpty) {
       if (mounted) {
         setState(() {
-          _routePoints = [];
-          _cumulativeMeters = [];
-          _totalDistanceMeters = 0;
-          _progress = 0;
+          _route.clear();
           _polylines = const {};
           _currentPosition = null;
           _lastInjectedPosition = null;
           _refreshMarkers();
         });
       } else {
-        _routePoints = [];
-        _cumulativeMeters = [];
-        _totalDistanceMeters = 0;
-        _progress = 0;
+        _route.clear();
         _polylines = const {};
         _currentPosition = null;
         _lastInjectedPosition = null;
@@ -1283,25 +1268,22 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
 
-    _routePoints = List<LatLng>.from(_customPoints);
-    _cumulativeMeters = _buildCumulativeMeters(_routePoints);
-    _totalDistanceMeters = _cumulativeMeters.isEmpty ? 0 : _cumulativeMeters.last;
-    _polylines = _routePoints.length >= 2
+    _route.setRoute(List<LatLng>.from(_customPoints));
+    _polylines = _route.hasRoute
         ? {
             Polyline(
               polylineId: const PolylineId('route'),
               color: Colors.blueAccent,
               width: 4,
-              points: _routePoints,
+              points: _route.points,
             ),
           }
         : const {};
-    _progress = 0;
     _setProgress(0);
   }
 
   void _addCustomPoint(LatLng position) {
-    if (_routePoints.isNotEmpty && !_usingCustomRoute) {
+    if (_route.hasPoints && !_usingCustomRoute) {
       _showSnack('Clear the loaded route to edit a custom route.');
       return;
     }
@@ -1724,17 +1706,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _pendingFitRoute = true;
       return;
     }
-    if (_routePoints.isEmpty) {
+    if (!_route.hasPoints) {
       return;
     }
     _pendingFitRoute = false;
 
-    if (_routePoints.length == 1) {
-      _mapController!.moveCamera(CameraUpdate.newLatLngZoom(_routePoints.first, 16));
+    if (_route.points.length == 1) {
+      _mapController!.moveCamera(CameraUpdate.newLatLngZoom(_route.points.first, 16));
       return;
     }
 
-    final bounds = _boundsFromLatLngs(_routePoints);
+    final bounds = _boundsFromLatLngs(_route.points);
     _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 48));
   }
 
@@ -1788,82 +1770,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         _appendDebugLog('Mock exception: ${error.message ?? error.code}');
       }
     }
-  }
-
-  List<LatLng> _decodePolyline(String encoded) {
-    final points = PolylinePoints().decodePolyline(encoded);
-    return points.map((point) => LatLng(point.latitude, point.longitude)).toList();
-  }
-
-  List<double> _buildCumulativeMeters(List<LatLng> points) {
-    if (points.isEmpty) {
-      return [];
-    }
-    final cumulative = List<double>.filled(points.length, 0);
-    for (var i = 1; i < points.length; i++) {
-      cumulative[i] = cumulative[i - 1] + _distanceMeters(points[i - 1], points[i]);
-    }
-    return cumulative;
-  }
-
-  LatLng _positionAtDistance(double meters) {
-    if (meters <= 0) {
-      return _routePoints.first;
-    }
-    if (meters >= _totalDistanceMeters) {
-      return _routePoints.last;
-    }
-
-    final index = _upperBound(_cumulativeMeters, meters);
-    final startIndex = math.max(0, index - 1);
-    final endIndex = math.min(_routePoints.length - 1, index);
-
-    final startDistance = _cumulativeMeters[startIndex];
-    final endDistance = _cumulativeMeters[endIndex];
-    final segmentLength = endDistance - startDistance;
-
-    if (segmentLength <= 0) {
-      return _routePoints[startIndex];
-    }
-
-    final t = (meters - startDistance) / segmentLength;
-    return _interpolate(_routePoints[startIndex], _routePoints[endIndex], t);
-  }
-
-  int _upperBound(List<double> values, double target) {
-    var low = 0;
-    var high = values.length;
-    while (low < high) {
-      final mid = low + ((high - low) >> 1);
-      if (values[mid] <= target) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-    return low;
-  }
-
-  double _distanceMeters(LatLng a, LatLng b) {
-    const earthRadius = 6371000.0;
-    final dLat = _degToRad(b.latitude - a.latitude);
-    final dLng = _degToRad(b.longitude - a.longitude);
-    final lat1 = _degToRad(a.latitude);
-    final lat2 = _degToRad(b.latitude);
-
-    final sinDLat = math.sin(dLat / 2);
-    final sinDLng = math.sin(dLng / 2);
-    final aa = sinDLat * sinDLat + math.cos(lat1) * math.cos(lat2) * sinDLng * sinDLng;
-    final c = 2 * math.atan2(math.sqrt(aa), math.sqrt(1 - aa));
-    return earthRadius * c;
-  }
-
-  double _degToRad(double degrees) => degrees * (math.pi / 180.0);
-
-  LatLng _interpolate(LatLng start, LatLng end, double t) {
-    final lat = start.latitude + (end.latitude - start.latitude) * t;
-    final lng = start.longitude + (end.longitude - start.longitude) * t;
-    return LatLng(lat, lng);
   }
 
   LatLngBounds _boundsFromLatLngs(List<LatLng> points) {

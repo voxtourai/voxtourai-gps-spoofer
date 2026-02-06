@@ -38,6 +38,7 @@ const List<HelpSection> helpSections = [
     'Map and camera',
     [
       'Recenter follows the current mock location on the map.',
+      'Fit route zooms the map to the loaded path.',
       'Drag the map to stop auto-follow.',
       'Tap the map to set a single mock location when no route is active.',
     ],

@@ -393,6 +393,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _openRouteInputSheet() async {
     final controller = TextEditingController(text: _routeController.text);
+    String? detectedPolyline;
     if (!mounted) {
       return;
     }
@@ -404,6 +405,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           builder: (context, value, _) {
             final trimmed = value.text.trim();
             final isEmpty = trimmed.isEmpty;
+            detectedPolyline = isEmpty ? null : _extractPolylineFromInput(trimmed);
             return AlertDialog(
               insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
               titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -437,6 +439,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             .textTheme
                             .bodySmall
                             ?.copyWith(color: Theme.of(context).colorScheme.error),
+                      ),
+                    ),
+                  ] else if (detectedPolyline != null) ...[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Polyline detected.',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Theme.of(context).colorScheme.primary),
                       ),
                     ),
                   ],
@@ -500,7 +514,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     return widget.mockController.getLastKnownLocation();
   }
 
-  void _clearRoute() {
+  Future<void> _clearRoute() async {
+    if (_playback.isPlaying && _route.hasRoute) {
+      final confirm = await _confirmDialog(
+        'Clear route?',
+        'Playback is running. Clear the route and stop playback?',
+        'Clear route',
+      );
+      if (!confirm) {
+        return;
+      }
+    }
     _stopPlayback();
     _routeState.clearAll();
   }

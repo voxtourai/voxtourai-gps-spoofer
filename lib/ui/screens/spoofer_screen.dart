@@ -15,10 +15,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../constants.dart';
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../models/help_section.dart';
+import '../map/map_style.dart';
 import '../widgets/uniform_track_shape.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
@@ -30,6 +30,11 @@ enum DarkModeSetting {
   off,
 }
 
+const String _tosAcceptedKey = 'tos_accepted_v1';
+const String _savedRoutesKey = 'saved_custom_routes_v1';
+const String _samplePolyline =
+    'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
+
 class SpooferScreen extends StatefulWidget {
   const SpooferScreen({super.key, required this.mockController});
 
@@ -40,7 +45,7 @@ class SpooferScreen extends StatefulWidget {
 }
 
 class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserver {
-  final TextEditingController _routeController = TextEditingController(text: samplePolyline);
+  final TextEditingController _routeController = TextEditingController(text: _samplePolyline);
 
   GoogleMapController? _mapController;
   bool _pendingFitRoute = false;
@@ -1392,7 +1397,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _upsertSavedRoute(String name) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(savedRoutesKey);
+    final raw = prefs.getString(_savedRoutesKey);
     final List<dynamic> routes = raw == null ? [] : (jsonDecode(raw) as List<dynamic>);
     final entry = {
       'name': name,
@@ -1411,12 +1416,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     } else {
       routes.add(entry);
     }
-    await prefs.setString(savedRoutesKey, jsonEncode(routes));
+    await prefs.setString(_savedRoutesKey, jsonEncode(routes));
   }
 
   Future<bool> _openSavedRoutes() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(savedRoutesKey);
+    final raw = prefs.getString(_savedRoutesKey);
     final List<dynamic> routes = raw == null ? [] : (jsonDecode(raw) as List<dynamic>);
     if (routes.isEmpty) {
       _showSnack('No saved routes yet.');
@@ -1448,7 +1453,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     icon: const Icon(Icons.delete),
                     onPressed: () async {
                       routes.removeAt(index);
-                      await prefs.setString(savedRoutesKey, jsonEncode(routes));
+                      await prefs.setString(_savedRoutesKey, jsonEncode(routes));
                       setSheetState(() {});
                     },
                   ),
@@ -1935,7 +1940,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool(tosAcceptedKey) ?? false;
+    final accepted = prefs.getBool(_tosAcceptedKey) ?? false;
     if (accepted) {
       _tosAccepted = true;
       return true;
@@ -1960,7 +1965,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           actions: [
             FilledButton(
               onPressed: () async {
-                await prefs.setBool(tosAcceptedKey, true);
+                await prefs.setBool(_tosAcceptedKey, true);
                 if (context.mounted) {
                   Navigator.of(context).pop();
                 }
@@ -1972,7 +1977,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       ),
     );
 
-    _tosAccepted = prefs.getBool(tosAcceptedKey) ?? false;
+    _tosAccepted = prefs.getBool(_tosAcceptedKey) ?? false;
     return _tosAccepted;
   }
 

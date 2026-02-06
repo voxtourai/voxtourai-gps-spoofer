@@ -1,9 +1,3 @@
-const String tosAcceptedKey = 'tos_accepted_v1';
-const String savedRoutesKey = 'saved_custom_routes_v1';
-
-const String samplePolyline =
-    'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
-
 const String darkMapStyle = r'''
 [
   {"elementType":"geometry","stylers":[{"color":"#1d2c4d"}]},

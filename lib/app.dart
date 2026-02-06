@@ -4,8 +4,8 @@ import 'controllers/mock_location_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'ui/screens/spoofer_screen.dart';
 
-class SpooferApp extends StatelessWidget {
-  const SpooferApp({super.key});
+class GpsSpooferApp extends StatelessWidget {
+  const GpsSpooferApp({super.key});
 
   @override
   Widget build(BuildContext context) {

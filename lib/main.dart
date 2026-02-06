@@ -401,7 +401,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     polylines: _polylines,
                     mapToolbarEnabled: false,
                     padding: EdgeInsets.only(
-                      bottom: bottomInset + (_selectedCustomIndex != null ? 96 : 56),
+                      bottom: bottomInset + 56,
                       right: 56,
                       left: 12,
                     ),

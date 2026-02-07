@@ -67,6 +67,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _startupChecksRunning = false;
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
+  DateTime? _lastUserMapTouchAt;
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
@@ -217,9 +218,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                   children: [
                     Listener(
                       onPointerDown: (_) {
-                        if (_mapState.autoFollow) {
-                          _mapState.setAutoFollow(false);
-                        }
+                        _lastUserMapTouchAt = DateTime.now();
                       },
                         child: GoogleMap(
                         key: ValueKey(
@@ -232,6 +231,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         onMapCreated: _onMapCreated,
                         onCameraMoveStarted: () {
                           if (_mapState.isProgrammaticMove) {
+                            return;
+                          }
+                          final lastTouch = _lastUserMapTouchAt;
+                          if (lastTouch == null ||
+                              DateTime.now().difference(lastTouch) > const Duration(milliseconds: 500)) {
                             return;
                           }
                           if (_mapState.autoFollow) {
@@ -263,11 +267,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                         markers: _mapState.markers,
                         polylines: _mapState.polylines,
                         mapToolbarEnabled: false,
-                        padding: EdgeInsets.only(
-                          bottom: bottomInset + 56,
-                          right: 56,
-                          left: 12,
-                        ),
+                        padding: _mapPaddingForCamera(context),
                         myLocationEnabled: _status.hasLocationPermission == true,
                         myLocationButtonEnabled: false,
                         zoomControlsEnabled: false,
@@ -538,6 +538,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _appendDebugLog(String message) {
     _status.appendDebugLog(message);
+  }
+
+  EdgeInsets _mapPaddingForCamera(BuildContext context) {
+    return EdgeInsets.zero;
   }
 
   void _handleTitleTap() {

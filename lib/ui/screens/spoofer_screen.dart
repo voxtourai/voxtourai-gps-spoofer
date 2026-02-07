@@ -16,10 +16,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/preferences_controller.dart';
 import '../../controllers/theme_controller.dart';
-import '../../controllers/ui_message_controller.dart';
 import '../../spoofer/bloc/map/spoofer_map_bloc.dart';
 import '../../spoofer/bloc/map/spoofer_map_event.dart';
 import '../../spoofer/bloc/map/spoofer_map_state.dart';
+import '../../spoofer/bloc/message/spoofer_message_cubit.dart';
+import '../../spoofer/bloc/message/spoofer_message_state.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_bloc.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_event.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_state.dart';
@@ -59,7 +60,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   late final _MapStateProxy _mapState;
 
   final PreferencesController _prefs = PreferencesController();
-  final UiMessageController _messages = UiMessageController();
   final SpooferRuntimeCoordinator _coordinator = const SpooferRuntimeCoordinator();
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
@@ -81,6 +81,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   SpooferSettingsCubit get _settingsCubit => context.read<SpooferSettingsCubit>();
   SpooferSettingsState get _settingsState => _settingsCubit.state;
+  SpooferMessageCubit get _messages => context.read<SpooferMessageCubit>();
 
   @override
   void initState() {
@@ -88,7 +89,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _mapState = _MapStateProxy(() => context.read<SpooferMapBloc>());
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initNotifications());
-    _messages.addListener(_handleUiMessage);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final accepted = await _ensureTosAccepted();
       if (accepted) {
@@ -103,8 +103,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _overlayMessage?.remove();
     _overlayMessage = null;
     _mapState.dispose();
-    _messages.removeListener(_handleUiMessage);
-    _messages.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
@@ -193,6 +191,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         ),
         BlocListener<SpooferMockBloc, SpooferMockState>(
           listener: (context, mockState) => _handleMockBlocState(mockState),
+        ),
+        BlocListener<SpooferMessageCubit, SpooferMessageState>(
+          listener: (context, messageState) => _handleUiMessageState(messageState),
         ),
       ],
       child: BlocBuilder<SpooferRouteBloc, SpooferRouteState>(
@@ -1700,17 +1701,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     });
   }
 
-  void _handleUiMessage() {
-    final message = _messages.message;
+  void _handleUiMessageState(SpooferMessageState messageState) {
+    final message = messageState.message;
     if (message == null || message.id == _lastMessageId || !mounted) {
       return;
     }
     _lastMessageId = message.id;
     switch (message.type) {
-      case UiMessageType.snack:
+      case SpooferMessageType.snack:
         _showOverlayMessage(message.message);
         break;
-      case UiMessageType.overlay:
+      case SpooferMessageType.overlay:
         _showOverlayMessage(message.message);
         break;
     }

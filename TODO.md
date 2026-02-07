@@ -3,17 +3,6 @@
 This file tracks the BLoC migration plan for the GPS spoofer app.
 As each chunk is implemented, remove that chunk from this file.
 
-## Chunk 1: BLoC scaffolding and wiring shell
-- Add `flutter_bloc` to dependencies.
-- Create BLoC folder structure:
-  - `lib/spoofer/bloc/route/`
-  - `lib/spoofer/bloc/playback/`
-  - `lib/spoofer/bloc/mock/`
-  - `lib/spoofer/bloc/map/`
-- Add initial `event/state/bloc` files for each domain.
-- Wrap app/screen with `MultiBlocProvider` while keeping current controllers active.
-- Goal: No behavior changes yet.
-
 ## Chunk 2: Route + waypoint migration
 - Move route parsing/progress/waypoint CRUD/saved routes into `SpooferRouteBloc`.
 - Replace route/waypoint controller reads in UI with `BlocBuilder`.

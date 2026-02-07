@@ -54,10 +54,24 @@ The app uses feature BLoCs plus a small runtime coordinator:
   - Key events: set position/markers/polylines, toggle auto-follow, pending fit, programmatic move, map style dark flag.
   - Key state: `currentPosition`, `lastInjectedPosition`, `markers`, `polylines`, `autoFollowEnabled`, `pendingFitRoute`, `isProgrammaticMove`.
 
+- `SpooferSettingsCubit`
+  - Owns UI settings toggles and dark-mode preference.
+  - Key actions: setup/debug/mock-marker toggles, background mode flags, dark-mode setting changes.
+  - Key state: `showSetupBar`, `showDebugPanel`, `showMockMarker`, `backgroundEnabled`, `backgroundBusy`, `backgroundNotificationShown`, `darkModeSetting`.
+
+- `SpooferMessageCubit`
+  - Owns one-shot UI messaging for snack/overlay notifications.
+  - Key actions: `showSnack`, `showOverlay`, `clear`.
+  - Key state: `message` with monotonic `id` and `type`.
+
 - `SpooferRuntimeCoordinator`
   - Coordinates cross-BLoC runtime math for playback ticks and route interpolation:
     - playback tick -> next route progress (+ boundary handling)
     - route progress -> map position interpolation
+
+- Infrastructure adapters (non-BLoC):
+  - `MockLocationController`: Android platform channel bridge for mock location operations.
+  - `PreferencesController`: persistence for TOS and saved custom routes.
 
 ## Testing
 

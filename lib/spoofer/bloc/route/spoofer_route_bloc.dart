@@ -6,7 +6,6 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../controllers/preferences_controller.dart';
-import '../../../controllers/waypoint_controller.dart';
 
 import 'spoofer_route_event.dart';
 import 'spoofer_route_state.dart';
@@ -33,21 +32,18 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
   }
 
   final PreferencesController _preferencesController;
-  final WaypointController _waypoints = WaypointController();
   List<LatLng> _routePoints = <LatLng>[];
   List<double> _routeCumulativeMeters = <double>[];
   double _routeTotalDistanceMeters = 0;
   double _routeProgress = 0;
+  List<LatLng> _waypointPoints = <LatLng>[];
+  List<String> _waypointNames = <String>[];
+  int? _selectedWaypointIndex;
+  bool _usingCustomRoute = false;
   List<Map<String, Object?>> _savedRoutes = const <Map<String, Object?>>[];
   bool _savedRoutesLoaded = false;
   int _messageId = 0;
   int _revision = 0;
-
-  @override
-  Future<void> close() {
-    _waypoints.dispose();
-    return super.close();
-  }
 
   void _onInitialized(
     SpooferRouteInitialized event,
@@ -63,7 +59,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     Emitter<SpooferRouteState> emit,
   ) {
     _clearRoute();
-    _waypoints.clear();
+    _clearWaypoints();
     emit(_buildState());
   }
 
@@ -82,11 +78,11 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointAddedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    if (_routePoints.isNotEmpty && !_waypoints.usingCustomRoute) {
+    if (_routePoints.isNotEmpty && !_usingCustomRoute) {
       emit(_buildState(message: 'Clear the loaded route to edit a custom route.'));
       return;
     }
-    _waypoints.addPoint(event.position);
+    _addWaypoint(event.position);
     _rebuildRouteFromWaypoints();
     emit(_buildState());
   }
@@ -95,7 +91,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointUpdatedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    _waypoints.updatePoint(event.index, event.position);
+    _updateWaypoint(event.index, event.position);
     _rebuildRouteFromWaypoints(resetProgress: false);
     emit(_buildState());
   }
@@ -104,7 +100,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointRemovedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    _waypoints.removePoint(event.index);
+    _removeWaypoint(event.index);
     _rebuildRouteFromWaypoints();
     emit(_buildState());
   }
@@ -113,7 +109,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointSelectedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    _waypoints.setSelectedIndex(event.index);
+    _selectedWaypointIndex = event.index;
     emit(_buildState());
   }
 
@@ -121,7 +117,10 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointRenamedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    _waypoints.renamePoint(event.index, event.name);
+    if (event.index < 0 || event.index >= _waypointNames.length) {
+      return;
+    }
+    _waypointNames[event.index] = event.name;
     emit(_buildState());
   }
 
@@ -129,7 +128,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointsReorderedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    _waypoints.reorder(event.oldIndex, event.newIndex);
+    _reorderWaypoints(event.oldIndex, event.newIndex);
     _rebuildRouteFromWaypoints(resetProgress: false);
     emit(_buildState());
   }
@@ -147,7 +146,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteSavedRouteSaveRequested event,
     Emitter<SpooferRouteState> emit,
   ) async {
-    if (_waypoints.points.isEmpty) {
+    if (_waypointPoints.isEmpty) {
       emit(_buildState(message: 'No custom route to save.'));
       return;
     }
@@ -158,8 +157,8 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     }
     await _preferencesController.upsertSavedRoute(
       name: name,
-      points: _waypoints.points,
-      names: _waypoints.names,
+      points: _waypointPoints,
+      names: _waypointNames,
     );
     _savedRoutes = await _preferencesController.loadSavedRoutes();
     _savedRoutesLoaded = true;
@@ -213,18 +212,18 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
       emit(_buildState(message: 'Saved route is empty.'));
       return;
     }
-    _waypoints.setFromSaved(points, names);
+    _setWaypointsFromSaved(points, names);
     _rebuildRouteFromWaypoints();
     emit(_buildState());
   }
 
   void _rebuildRouteFromWaypoints({bool resetProgress = true}) {
-    if (_waypoints.points.isEmpty) {
+    if (_waypointPoints.isEmpty) {
       _clearRoute();
       return;
     }
     final previousProgress = _routeProgress;
-    _setRoute(List<LatLng>.from(_waypoints.points));
+    _setRoute(List<LatLng>.from(_waypointPoints));
     if (!resetProgress && _routeTotalDistanceMeters > 0) {
       _setProgress(previousProgress);
     }
@@ -252,7 +251,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
         emit(_buildState(message: 'Failed to decode polyline.'));
         return;
       }
-      _waypoints.clear();
+      _clearWaypoints();
       _setRoute(points);
       _setProgress(0);
       emit(_buildState());
@@ -352,10 +351,10 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
       progress: _routeProgress,
       totalDistanceMeters: _routeTotalDistanceMeters,
       currentRoutePosition: _positionForCurrentProgress(),
-      waypointPoints: List<LatLng>.unmodifiable(_waypoints.points),
-      waypointNames: List<String>.unmodifiable(_waypoints.names),
-      selectedWaypointIndex: _waypoints.selectedIndex,
-      usingCustomRoute: _waypoints.usingCustomRoute,
+      waypointPoints: List<LatLng>.unmodifiable(_waypointPoints),
+      waypointNames: List<String>.unmodifiable(_waypointNames),
+      selectedWaypointIndex: _selectedWaypointIndex,
+      usingCustomRoute: _usingCustomRoute,
       savedRoutes: List<Map<String, Object?>>.unmodifiable(_savedRoutes),
       savedRoutesLoaded: _savedRoutesLoaded,
       message: messageModel,
@@ -373,6 +372,93 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     _routeTotalDistanceMeters = 0;
     _routeProgress = 0;
   }
+
+  void _clearWaypoints() {
+    _waypointPoints = <LatLng>[];
+    _waypointNames = <String>[];
+    _selectedWaypointIndex = null;
+    _usingCustomRoute = false;
+  }
+
+  void _addWaypoint(LatLng position) {
+    _usingCustomRoute = true;
+    _waypointPoints.add(position);
+    _waypointNames.add(_defaultWaypointName(_waypointPoints.length - 1));
+  }
+
+  void _updateWaypoint(int index, LatLng position) {
+    if (index < 0 || index >= _waypointPoints.length) {
+      return;
+    }
+    _waypointPoints[index] = position;
+  }
+
+  void _removeWaypoint(int index) {
+    if (index < 0 || index >= _waypointPoints.length) {
+      return;
+    }
+    _waypointPoints.removeAt(index);
+    _waypointNames.removeAt(index);
+    if (_waypointPoints.isEmpty) {
+      _usingCustomRoute = false;
+      _waypointNames = <String>[];
+    }
+    if (_selectedWaypointIndex == index) {
+      _selectedWaypointIndex = null;
+    }
+    _normalizeDefaultWaypointNames();
+  }
+
+  void _setWaypointsFromSaved(List<LatLng> points, List<String> names) {
+    _usingCustomRoute = true;
+    _waypointPoints = List<LatLng>.from(points);
+    _waypointNames = names.length == points.length
+        ? List<String>.from(names)
+        : List<String>.generate(points.length, _defaultWaypointName);
+    _selectedWaypointIndex = null;
+  }
+
+  void _reorderWaypoints(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _waypointPoints.length) {
+      return;
+    }
+    if (newIndex < 0 || newIndex > _waypointPoints.length) {
+      return;
+    }
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+    if (newIndex == oldIndex) {
+      return;
+    }
+
+    final point = _waypointPoints.removeAt(oldIndex);
+    final name = _waypointNames.removeAt(oldIndex);
+    _waypointPoints.insert(newIndex, point);
+    _waypointNames.insert(newIndex, name);
+
+    if (_selectedWaypointIndex != null) {
+      final selected = _selectedWaypointIndex!;
+      if (selected == oldIndex) {
+        _selectedWaypointIndex = newIndex;
+      } else if (oldIndex < selected && newIndex >= selected) {
+        _selectedWaypointIndex = selected - 1;
+      } else if (oldIndex > selected && newIndex <= selected) {
+        _selectedWaypointIndex = selected + 1;
+      }
+    }
+    _normalizeDefaultWaypointNames();
+  }
+
+  void _normalizeDefaultWaypointNames() {
+    for (var i = 0; i < _waypointNames.length; i++) {
+      if (RegExp(r'^Waypoint\s+\d+$').hasMatch(_waypointNames[i])) {
+        _waypointNames[i] = _defaultWaypointName(i);
+      }
+    }
+  }
+
+  String _defaultWaypointName(int index) => 'Waypoint ${index + 1}';
 
   void _setRoute(List<LatLng> points) {
     _routePoints = points;

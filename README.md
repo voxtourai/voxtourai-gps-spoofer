@@ -29,3 +29,49 @@ Android‑first Flutter app for mocking GPS location along a route or custom way
 ## Notes
 - Requires Android Developer Options with this app selected as mock location app.
 - Device geocoding search quality depends on OS/geocoder availability.
+
+## Architecture (BLoC)
+
+The app uses feature BLoCs plus a small runtime coordinator:
+
+- `SpooferRouteBloc`
+  - Owns route parsing, route progress, waypoint CRUD/reorder/rename, and saved custom routes.
+  - Key events: load/clear/progress set, waypoint add/update/remove/select/rename/reorder, saved route load/save/delete/apply.
+  - Key state: `routePoints`, `progress`, `totalDistanceMeters`, `waypointPoints`, `waypointNames`, `savedRoutes`, optional `message`.
+
+- `SpooferPlaybackBloc`
+  - Owns play/pause state, speed, app pause/resume behavior, and tick timer.
+  - Key events: play/pause, speed set, lifecycle pause/resume, tick clock reset.
+  - Key state: `isPlaying`, `speedMps`, `tickSequence`, `tickDeltaSeconds`, `resumeAfterPause`.
+
+- `SpooferMockBloc`
+  - Owns startup checks, mock status, mock apply/clear operations, prompt/message side effects, and debug log.
+  - Key events: startup checks, prompt resolved, refresh status, apply/clear mock location, status/error/log updates.
+  - Key state: permissions/dev/mock-app flags, last mock result, selected mock app, `mockError`, `debugLog`, optional `prompt` and `message`.
+
+- `SpooferMapBloc`
+  - Owns map UI state used by the screen: current/injected positions, markers/polylines, follow/fit/programmatic flags, map style mode cache.
+  - Key events: set position/markers/polylines, toggle auto-follow, pending fit, programmatic move, map style dark flag.
+  - Key state: `currentPosition`, `lastInjectedPosition`, `markers`, `polylines`, `autoFollowEnabled`, `pendingFitRoute`, `isProgrammaticMove`.
+
+- `SpooferRuntimeCoordinator`
+  - Coordinates cross-BLoC runtime math for playback ticks and route interpolation:
+    - playback tick -> next route progress (+ boundary handling)
+    - route progress -> map position interpolation
+
+## Testing
+
+- Unit tests:
+  - `test/spoofer_route_bloc_test.dart`
+  - `test/spoofer_playback_bloc_test.dart`
+  - `test/spoofer_mock_bloc_test.dart`
+  - `test/spoofer_map_bloc_test.dart`
+  - `test/spoofer_runtime_coordinator_test.dart`
+- Integration smoke:
+  - `integration_test/app_smoke_test.dart`
+
+IntelliJ shared run configs live in `.run/`:
+- `Flutter Analyze`
+- `Flutter Test All`
+- `Route Bloc Tests`
+- `Integration Smoke`

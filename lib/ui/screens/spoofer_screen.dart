@@ -14,11 +14,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../controllers/mock_location_controller.dart';
-import '../../controllers/map_state_controller.dart';
 import '../../controllers/preferences_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../controllers/ui_message_controller.dart';
+import '../../spoofer/bloc/map/spoofer_map_bloc.dart';
+import '../../spoofer/bloc/map/spoofer_map_event.dart';
+import '../../spoofer/bloc/map/spoofer_map_state.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_bloc.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_event.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_state.dart';
@@ -52,7 +54,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final TextEditingController _routeController = TextEditingController();
 
   GoogleMapController? _mapController;
-  final MapStateController _mapState = MapStateController();
+  late final _MapStateProxy _mapState;
 
   final SettingsController _settings = SettingsController();
   final PreferencesController _prefs = PreferencesController();
@@ -75,6 +77,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   void initState() {
     super.initState();
+    _mapState = _MapStateProxy(() => context.read<SpooferMapBloc>());
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initNotifications());
     _messages.addListener(_handleUiMessage);
@@ -2075,5 +2078,70 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       ),
     );
     return result ?? false;
+  }
+}
+
+class _MapStateProxy extends ChangeNotifier {
+  _MapStateProxy(this._blocAccessor) {
+    _subscription = _blocAccessor().stream.listen((_) => notifyListeners());
+  }
+
+  final SpooferMapBloc Function() _blocAccessor;
+  late final StreamSubscription<SpooferMapState> _subscription;
+
+  SpooferMapState get _state => _blocAccessor().state;
+
+  LatLng? get currentPosition => _state.currentPosition;
+  LatLng? get lastInjectedPosition => _state.lastInjectedPosition;
+  Set<Polyline> get polylines => _state.polylines;
+  Set<Marker> get markers => _state.markers;
+  bool get autoFollow => _state.autoFollowEnabled;
+  bool get pendingFitRoute => _state.pendingFitRoute;
+  bool get isProgrammaticMove => _state.isProgrammaticMove;
+  bool? get lastMapStyleDark => _state.lastMapStyleDark;
+
+  void setCurrentPosition(LatLng? value, {bool updateLastInjected = false}) {
+    _blocAccessor().add(
+      SpooferMapCurrentPositionSetRequested(
+        position: value,
+        updateLastInjected: updateLastInjected,
+      ),
+    );
+  }
+
+  void setLastInjectedPosition(LatLng? value) {
+    _blocAccessor().add(
+      SpooferMapLastInjectedPositionSetRequested(position: value),
+    );
+  }
+
+  void setPolylines(Set<Polyline> value) {
+    _blocAccessor().add(SpooferMapPolylinesSetRequested(polylines: value));
+  }
+
+  void setMarkers(Set<Marker> value) {
+    _blocAccessor().add(SpooferMapMarkersSetRequested(markers: value));
+  }
+
+  void setAutoFollow(bool value) {
+    _blocAccessor().add(SpooferMapAutoFollowSetRequested(value: value));
+  }
+
+  void setPendingFitRoute(bool value) {
+    _blocAccessor().add(SpooferMapPendingFitRouteSetRequested(value: value));
+  }
+
+  void setProgrammaticMove(bool value) {
+    _blocAccessor().add(SpooferMapProgrammaticMoveSetRequested(value: value));
+  }
+
+  void setLastMapStyleDark(bool? value) {
+    _blocAccessor().add(SpooferMapLastMapStyleDarkSetRequested(value: value));
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 }

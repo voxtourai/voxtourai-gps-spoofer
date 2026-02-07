@@ -3,11 +3,6 @@
 This file tracks the BLoC migration plan for the GPS spoofer app.
 As each chunk is implemented, remove that chunk from this file.
 
-## Chunk 5: Map interaction migration
-- Move map tap/long-press/recenter/fit-route/autofollow events into `SpooferMapBloc`.
-- Move marker/polyline view-model generation into map bloc.
-- Goal: Current map behavior and controls remain unchanged.
-
 ## Chunk 6: Cross-bloc coordination
 - Define explicit coordination points:
   - route + playback -> target position

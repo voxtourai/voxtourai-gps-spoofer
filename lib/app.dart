@@ -11,6 +11,7 @@ import 'spoofer/bloc/playback/spoofer_playback_bloc.dart';
 import 'spoofer/bloc/playback/spoofer_playback_event.dart';
 import 'spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'spoofer/bloc/route/spoofer_route_event.dart';
+import 'spoofer/bloc/settings/spoofer_settings_cubit.dart';
 import 'ui/screens/spoofer_screen.dart';
 
 class GpsSpooferApp extends StatelessWidget {
@@ -48,6 +49,9 @@ class GpsSpooferApp extends StatelessWidget {
               ),
               BlocProvider<SpooferMapBloc>(
                 create: (_) => SpooferMapBloc()..add(const SpooferMapInitialized()),
+              ),
+              BlocProvider<SpooferSettingsCubit>(
+                create: (_) => SpooferSettingsCubit(),
               ),
             ],
             child: SpooferScreen(mockController: mockLocationController),

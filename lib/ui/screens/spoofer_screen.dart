@@ -15,7 +15,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/preferences_controller.dart';
-import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../controllers/ui_message_controller.dart';
 import '../../spoofer/bloc/map/spoofer_map_bloc.dart';
@@ -30,6 +29,8 @@ import '../../spoofer/bloc/playback/spoofer_playback_state.dart';
 import '../../spoofer/bloc/route/spoofer_route_bloc.dart';
 import '../../spoofer/bloc/route/spoofer_route_event.dart';
 import '../../spoofer/bloc/route/spoofer_route_state.dart';
+import '../../spoofer/bloc/settings/spoofer_settings_cubit.dart';
+import '../../spoofer/bloc/settings/spoofer_settings_state.dart';
 import '../../spoofer/coordinator/spoofer_runtime_coordinator.dart';
 import '../map/map_style.dart';
 import '../help/help_content.dart';
@@ -57,7 +58,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   GoogleMapController? _mapController;
   late final _MapStateProxy _mapState;
 
-  final SettingsController _settings = SettingsController();
   final PreferencesController _prefs = PreferencesController();
   final UiMessageController _messages = UiMessageController();
   final SpooferRuntimeCoordinator _coordinator = const SpooferRuntimeCoordinator();
@@ -78,6 +78,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _packageInfoLoading = false;
   int _titleTapCount = 0;
   DateTime? _lastTitleTapAt;
+
+  SpooferSettingsCubit get _settingsCubit => context.read<SpooferSettingsCubit>();
+  SpooferSettingsState get _settingsState => _settingsCubit.state;
+
   @override
   void initState() {
     super.initState();
@@ -99,7 +103,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _overlayMessage?.remove();
     _overlayMessage = null;
     _mapState.dispose();
-    _settings.dispose();
     _messages.removeListener(_handleUiMessage);
     _messages.dispose();
     unawaited(_cancelBackgroundNotification());
@@ -109,7 +112,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_settings.backgroundEnabled) {
+    if (_settingsState.backgroundEnabled) {
       if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
         unawaited(_showBackgroundNotification());
       } else if (state == AppLifecycleState.resumed) {
@@ -127,7 +130,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   @override
   void didChangePlatformBrightness() {
-    if (!mounted || _settings.darkModeSetting != DarkModeSetting.on) {
+    if (!mounted || _settingsState.darkModeSetting != DarkModeSetting.on) {
       return;
     }
     unawaited(_applyMapStyle(force: true));
@@ -141,7 +144,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _showBackgroundNotification() async {
-    if (_settings.backgroundNotificationShown) {
+    if (_settingsState.backgroundNotificationShown) {
       return;
     }
     final androidDetails = flutter_local_notifications.AndroidNotificationDetails(
@@ -160,15 +163,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       'Mock GPS can keep running in the background.',
       details,
     );
-    _settings.setBackgroundNotificationShown(true);
+    _settingsCubit.setBackgroundNotificationShown(true);
   }
 
   Future<void> _cancelBackgroundNotification() async {
-    if (!_settings.backgroundNotificationShown) {
+    if (!_settingsState.backgroundNotificationShown) {
       return;
     }
     await _notifications.cancel(_backgroundNotificationId);
-    _settings.setBackgroundNotificationShown(false);
+    _settingsCubit.setBackgroundNotificationShown(false);
   }
 
   @override
@@ -198,9 +201,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             builder: (context, playbackState) {
               return BlocBuilder<SpooferMockBloc, SpooferMockState>(
                 builder: (context, mockState) {
-                  return AnimatedBuilder(
-                    animation: _settings,
-                    builder: (context, _) {
+                  return BlocBuilder<SpooferSettingsCubit, SpooferSettingsState>(
+                    builder: (context, settingsState) {
                   return Scaffold(
                     appBar: AppBar(
                       toolbarHeight: 48,
@@ -404,25 +406,26 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             ],
                           ),
                         ),
-                        AnimatedBuilder(
-                          animation: _settings,
-                          builder: (context, _) {
-                            return AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              transitionBuilder: (child, animation) => SizeTransition(
-                                sizeFactor: animation,
-                                axisAlignment: -1,
-                                child: FadeTransition(opacity: animation, child: child),
-                              ),
-                              child: routeState.hasRoute
-                                  ? SafeArea(
-                                      key: const ValueKey('controls'),
-                                      top: false,
-                                      child: _buildControls(context, routeState, playbackState, mockState),
-                                    )
-                                  : const SizedBox.shrink(key: ValueKey('no-controls')),
-                            );
-                          },
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          transitionBuilder: (child, animation) => SizeTransition(
+                            sizeFactor: animation,
+                            axisAlignment: -1,
+                            child: FadeTransition(opacity: animation, child: child),
+                          ),
+                          child: routeState.hasRoute
+                              ? SafeArea(
+                                  key: const ValueKey('controls'),
+                                  top: false,
+                                  child: _buildControls(
+                                    context,
+                                    routeState,
+                                    playbackState,
+                                    mockState,
+                                    settingsState,
+                                  ),
+                                )
+                              : const SizedBox.shrink(key: ValueKey('no-controls')),
                         ),
                       ],
                     ),
@@ -443,6 +446,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     SpooferRouteState routeState,
     SpooferPlaybackState playbackState,
     SpooferMockState mockState,
+    SpooferSettingsState settingsState,
   ) {
     final bool hasRoute = routeState.hasRoute;
     final progressLabel = '${(routeState.progress * 100).toStringAsFixed(0)}%';
@@ -451,7 +455,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         : '0 m';
 
     return ControlsPanel(
-      showSetupBar: _settings.showSetupBar,
+      showSetupBar: settingsState.showSetupBar,
       setupLabel: 'Setup: '
           'location ${_statusLabel(mockState.hasLocationPermission)} · '
           'dev ${_statusLabel(mockState.isDeveloperModeEnabled)} · '
@@ -800,7 +804,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Widget _buildDebugPanel(BuildContext context, SpooferMockState mockState) {
     final status = mockState.lastMockStatus;
     final theme = Theme.of(context);
-    if (!_settings.showDebugPanel) {
+    if (!_settingsState.showDebugPanel) {
       return const SizedBox.shrink();
     }
     return Container(
@@ -909,7 +913,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return false;
     }
 
-    _settings.setBackgroundBusy(true);
+    _settingsCubit.setBackgroundBusy(true);
 
     try {
       if (enabled) {
@@ -936,12 +940,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           _messages.showSnack('Failed to enable background mode.');
           return false;
         }
-        _settings.setBackgroundEnabled(true);
+        _settingsCubit.setBackgroundEnabled(true);
         _messages.showSnack('Background mode enabled. Keep playback running to spoof.');
         return true;
       } else {
         await FlutterBackground.disableBackgroundExecution();
-        _settings.setBackgroundEnabled(false);
+        _settingsCubit.setBackgroundEnabled(false);
         unawaited(_cancelBackgroundNotification());
         return true;
       }
@@ -949,7 +953,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _messages.showSnack('Background mode error: $error');
       return false;
     } finally {
-      _settings.setBackgroundBusy(false);
+      _settingsCubit.setBackgroundBusy(false);
     }
   }
 
@@ -992,7 +996,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   bool _shouldUseDarkMapStyle() {
-    switch (_settings.darkModeSetting) {
+    switch (_settingsState.darkModeSetting) {
       case DarkModeSetting.on:
         return scheduler.SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
       case DarkModeSetting.uiOnly:
@@ -1005,7 +1009,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _applyDarkModeSetting(DarkModeSetting setting) {
-    _settings.setDarkModeSetting(setting);
+    _settingsCubit.setDarkModeSetting(setting);
     switch (setting) {
       case DarkModeSetting.on:
         themeController.mode.value = ThemeMode.system;
@@ -1189,7 +1193,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final state = routeState ?? context.read<SpooferRouteBloc>().state;
     final markers = <Marker>{};
     final currentPosition = _mapState.currentPosition;
-    if (_settings.showMockMarker && currentPosition != null) {
+    if (_settingsState.showMockMarker && currentPosition != null) {
       markers.add(
         Marker(
           markerId: const MarkerId('current'),
@@ -1779,12 +1783,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (!mounted) {
       return;
     }
-    var showSetupBar = _settings.showSetupBar;
-    var showDebugPanel = _settings.showDebugPanel;
-    var showMockMarker = _settings.showMockMarker;
-    var backgroundEnabled = _settings.backgroundEnabled;
-    var backgroundBusy = _settings.backgroundBusy;
-    var darkModeSetting = _settings.darkModeSetting;
+    final initialSettings = _settingsState;
+    var showSetupBar = initialSettings.showSetupBar;
+    var showDebugPanel = initialSettings.showDebugPanel;
+    var showMockMarker = initialSettings.showMockMarker;
+    var backgroundEnabled = initialSettings.backgroundEnabled;
+    var backgroundBusy = initialSettings.backgroundBusy;
+    var darkModeSetting = initialSettings.darkModeSetting;
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -1860,7 +1865,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showSetupBar = value;
                             });
-                            _settings.setShowSetupBar(value);
+                            _settingsCubit.setShowSetupBar(value);
                           },
                         ),
                         buildToggle(
@@ -1870,7 +1875,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showDebugPanel = value;
                             });
-                            _settings.setShowDebugPanel(value);
+                            _settingsCubit.setShowDebugPanel(value);
                           },
                         ),
                         buildToggle(
@@ -1880,7 +1885,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showMockMarker = value;
                             });
-                            _settings.setShowMockMarker(value);
+                            _settingsCubit.setShowMockMarker(value);
                             _refreshMarkers();
                           },
                         ),
@@ -1900,13 +1905,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                   backgroundEnabled = value;
                                   backgroundBusy = true;
                                 });
-                                _settings.setBackgroundBusy(true);
+                                _settingsCubit.setBackgroundBusy(true);
                                 final ok = await _setBackgroundMode(value);
                                 setModalState(() {
                                   backgroundBusy = false;
-                                  backgroundEnabled = _settings.backgroundEnabled;
+                                  backgroundEnabled = _settingsState.backgroundEnabled;
                                 });
-                                _settings.setBackgroundBusy(false);
+                                _settingsCubit.setBackgroundBusy(false);
                                 if (!ok) {
                                   // snack handled in _setBackgroundMode
                                 }
@@ -1922,13 +1927,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               backgroundEnabled = next;
                               backgroundBusy = true;
                             });
-                            _settings.setBackgroundBusy(true);
+                            _settingsCubit.setBackgroundBusy(true);
                             final ok = await _setBackgroundMode(next);
                             setModalState(() {
                               backgroundBusy = false;
-                              backgroundEnabled = _settings.backgroundEnabled;
+                              backgroundEnabled = _settingsState.backgroundEnabled;
                             });
-                            _settings.setBackgroundBusy(false);
+                            _settingsCubit.setBackgroundBusy(false);
                             if (!ok) {
                               // snack handled in _setBackgroundMode
                             }

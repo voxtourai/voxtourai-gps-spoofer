@@ -57,7 +57,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final TextEditingController _routeController = TextEditingController();
 
   GoogleMapController? _mapController;
-  late final _MapStateProxy _mapState;
 
   final PreferencesController _prefs = PreferencesController();
   final SpooferRuntimeCoordinator _coordinator = const SpooferRuntimeCoordinator();
@@ -82,11 +81,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   SpooferSettingsCubit get _settingsCubit => context.read<SpooferSettingsCubit>();
   SpooferSettingsState get _settingsState => _settingsCubit.state;
   SpooferMessageCubit get _messages => context.read<SpooferMessageCubit>();
+  SpooferMapBloc get _mapBloc => context.read<SpooferMapBloc>();
+  SpooferMapState get _mapState => _mapBloc.state;
 
   @override
   void initState() {
     super.initState();
-    _mapState = _MapStateProxy(() => context.read<SpooferMapBloc>());
     WidgetsBinding.instance.addObserver(this);
     unawaited(_initNotifications());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -102,7 +102,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.removeObserver(this);
     _overlayMessage?.remove();
     _overlayMessage = null;
-    _mapState.dispose();
     unawaited(_cancelBackgroundNotification());
     _routeController.dispose();
     super.dispose();
@@ -172,6 +171,43 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _settingsCubit.setBackgroundNotificationShown(false);
   }
 
+  void _setMapCurrentPosition(LatLng? position, {bool updateLastInjected = false}) {
+    _mapBloc.add(
+      SpooferMapCurrentPositionSetRequested(
+        position: position,
+        updateLastInjected: updateLastInjected,
+      ),
+    );
+  }
+
+  void _setMapLastInjectedPosition(LatLng? position) {
+    _mapBloc.add(SpooferMapLastInjectedPositionSetRequested(position: position));
+  }
+
+  void _setMapPolylines(Set<Polyline> polylines) {
+    _mapBloc.add(SpooferMapPolylinesSetRequested(polylines: polylines));
+  }
+
+  void _setMapMarkers(Set<Marker> markers) {
+    _mapBloc.add(SpooferMapMarkersSetRequested(markers: markers));
+  }
+
+  void _setMapAutoFollow(bool value) {
+    _mapBloc.add(SpooferMapAutoFollowSetRequested(value: value));
+  }
+
+  void _setMapPendingFitRoute(bool value) {
+    _mapBloc.add(SpooferMapPendingFitRouteSetRequested(value: value));
+  }
+
+  void _setMapProgrammaticMove(bool value) {
+    _mapBloc.add(SpooferMapProgrammaticMoveSetRequested(value: value));
+  }
+
+  void _setMapLastMapStyleDark(bool? value) {
+    _mapBloc.add(SpooferMapLastMapStyleDarkSetRequested(value: value));
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -236,9 +272,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           flex: 15,
                           child: Stack(
                             children: [
-                              AnimatedBuilder(
-                                animation: _mapState,
-                                builder: (context, _) {
+                              BlocBuilder<SpooferMapBloc, SpooferMapState>(
+                                builder: (context, mapState) {
                                   return Listener(
                                     onPointerDown: (_) {
                                       _activePointers += 1;
@@ -259,32 +294,32 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                         'map-${mockState.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
                                       ),
                                       initialCameraPosition: CameraPosition(
-                                        target: _mapState.currentPosition ?? const LatLng(0, 0),
-                                        zoom: _mapState.currentPosition == null ? 2 : 16,
+                                        target: mapState.currentPosition ?? const LatLng(0, 0),
+                                        zoom: mapState.currentPosition == null ? 2 : 16,
                                       ),
                                       onMapCreated: _onMapCreated,
                                       onCameraMoveStarted: () {
                                         if (_userInteracting) {
-                                          if (_mapState.autoFollow) {
-                                            _mapState.setAutoFollow(false);
+                                          if (mapState.autoFollowEnabled) {
+                                            _setMapAutoFollow(false);
                                           }
-                                          if (_mapState.isProgrammaticMove) {
-                                            _mapState.setProgrammaticMove(false);
+                                          if (mapState.isProgrammaticMove) {
+                                            _setMapProgrammaticMove(false);
                                           }
                                           return;
                                         }
-                                        if (_mapState.isProgrammaticMove) {
+                                        if (mapState.isProgrammaticMove) {
                                           return;
                                         }
                                       },
                                       onCameraMove: (_) {
-                                        if (_userInteracting && _mapState.autoFollow) {
-                                          _mapState.setAutoFollow(false);
+                                        if (_userInteracting && mapState.autoFollowEnabled) {
+                                          _setMapAutoFollow(false);
                                         }
                                       },
                                       onCameraIdle: () {
-                                        if (_mapState.isProgrammaticMove) {
-                                          _mapState.setProgrammaticMove(false);
+                                        if (mapState.isProgrammaticMove) {
+                                          _setMapProgrammaticMove(false);
                                         }
                                       },
                                       onTap: (position) {
@@ -306,8 +341,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                         }
                                         _addCustomPoint(position);
                                       },
-                                      markers: _mapState.markers,
-                                      polylines: _mapState.polylines,
+                                      markers: mapState.markers,
+                                      polylines: mapState.polylines,
                                       mapToolbarEnabled: false,
                                       padding: _mapPaddingForCamera(context),
                                       myLocationEnabled: mockState.hasLocationPermission == true,
@@ -317,9 +352,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                   );
                                 },
                               ),
-                              AnimatedBuilder(
-                                animation: _mapState,
-                                builder: (context, _) {
+                              BlocBuilder<SpooferMapBloc, SpooferMapState>(
+                                builder: (context, mapState) {
                                   final hasRoute = routeState.hasRoute;
                                   final bottomInset = MediaQuery.of(context).padding.bottom;
                                   final controlsVisible = routeState.hasRoute;
@@ -360,19 +394,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                             ],
                                             FloatingActionButton.small(
                                               heroTag: 'recenter',
-                                              onPressed: _mapState.currentPosition == null
+                                              onPressed: mapState.currentPosition == null
                                                   ? null
                                                   : () {
-                                                      final wasAutoFollow = _mapState.autoFollow;
-                                                      _mapState.setAutoFollow(true);
-                                                      _followCamera(_mapState.currentPosition!);
+                                                      final wasAutoFollow = mapState.autoFollowEnabled;
+                                                      _setMapAutoFollow(true);
+                                                      _followCamera(mapState.currentPosition!);
                                                       if (!wasAutoFollow) {
                                                         _messages.showOverlay('Auto-follow enabled');
                                                       }
                                                     },
                                               tooltip: 'Recenter',
                                               child: Icon(
-                                                _mapState.autoFollow
+                                                mapState.autoFollowEnabled
                                                     ? Icons.my_location
                                                     : Icons.center_focus_strong,
                                               ),
@@ -611,8 +645,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     _stopPlayback();
     context.read<SpooferRouteBloc>().add(const SpooferRouteClearRequested());
-    _mapState.setCurrentPosition(null, updateLastInjected: true);
-    _mapState.setPolylines(const <Polyline>{});
+    _setMapCurrentPosition(null, updateLastInjected: true);
+    _setMapPolylines(const <Polyline>{});
     _refreshMarkers();
   }
 
@@ -629,7 +663,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (!routeState.hasRoute && context.read<SpooferPlaybackBloc>().state.isPlaying) {
       _stopPlayback();
     }
-    _mapState.setPolylines(_buildRoutePolylines(routeState.routePoints));
+    _setMapPolylines(_buildRoutePolylines(routeState.routePoints));
     _refreshMarkers(routeState);
   }
 
@@ -960,7 +994,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    _mapState.setLastMapStyleDark(null);
+    _setMapLastMapStyleDark(null);
     unawaited(_applyMapStyle(force: true));
     unawaited(_retryInitialMapStyleApply());
     if (_mapState.pendingFitRoute) {
@@ -988,10 +1022,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     try {
       await _mapController!.setMapStyle(useDarkStyle ? darkMapStyle : null);
-      _mapState.setLastMapStyleDark(useDarkStyle);
+      _setMapLastMapStyleDark(useDarkStyle);
       return true;
     } catch (_) {
-      _mapState.setLastMapStyleDark(null);
+      _setMapLastMapStyleDark(null);
       return false;
     }
   }
@@ -1046,7 +1080,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
       if (nextState.hasRoute) {
         final position = nextState.currentRoutePosition ?? nextState.routePoints.first;
-        _mapState.setCurrentPosition(position, updateLastInjected: true);
+        _setMapCurrentPosition(position, updateLastInjected: true);
         _refreshMarkers(nextState);
         unawaited(_sendMockLocation(position));
         _fitRouteToMap();
@@ -1162,7 +1196,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final position = _coordinator.positionForProgress(routeState, clamped) ?? routeState.routePoints.first;
     context.read<SpooferRouteBloc>().add(SpooferRouteProgressSetRequested(progress: clamped));
 
-    _mapState.setCurrentPosition(position, updateLastInjected: true);
+    _setMapCurrentPosition(position, updateLastInjected: true);
     _refreshMarkers(routeState);
     unawaited(_sendMockLocation(position));
     _followCamera(position);
@@ -1177,12 +1211,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       unawaited(_clearRoute());
     }
     _stopPlayback();
-    _mapState.setCurrentPosition(position, updateLastInjected: true);
-    _mapState.setAutoFollow(true);
+    _setMapCurrentPosition(position, updateLastInjected: true);
+    _setMapAutoFollow(true);
     _refreshMarkers();
     unawaited(_sendMockLocation(position));
     if (_mapController != null) {
-      _mapState.setProgrammaticMove(true);
+      _setMapProgrammaticMove(true);
       final update = zoom == null ? CameraUpdate.newLatLng(position) : CameraUpdate.newLatLngZoom(position, zoom);
       _mapController!.animateCamera(update);
       return;
@@ -1235,7 +1269,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         ),
       );
     }
-    _mapState.setMarkers(markers);
+    _setMapMarkers(markers);
   }
 
   void _addCustomPoint(LatLng position) {
@@ -1553,23 +1587,23 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _followCamera(LatLng position) {
-    if (_mapController == null || !_mapState.autoFollow || _userInteracting) {
+    if (_mapController == null || !_mapState.autoFollowEnabled || _userInteracting) {
       return;
     }
-    _mapState.setProgrammaticMove(true);
+    _setMapProgrammaticMove(true);
     _mapController!.moveCamera(CameraUpdate.newLatLng(position));
   }
 
   void _fitRouteToMap() {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (_mapController == null) {
-      _mapState.setPendingFitRoute(true);
+      _setMapPendingFitRoute(true);
       return;
     }
     if (!routeState.hasPoints) {
       return;
     }
-    _mapState.setPendingFitRoute(false);
+    _setMapPendingFitRoute(false);
 
     if (routeState.routePoints.length == 1) {
       _mapController!.moveCamera(CameraUpdate.newLatLngZoom(routeState.routePoints.first, 16));
@@ -1988,9 +2022,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               _messages.showSnack('Real location not available yet.');
                               return;
                             }
-                            _mapState.setCurrentPosition(location);
-                            _mapState.setLastInjectedPosition(null);
-                            _mapState.setAutoFollow(true);
+                            _setMapCurrentPosition(location);
+                            _setMapLastInjectedPosition(null);
+                            _setMapAutoFollow(true);
                             _refreshMarkers();
                             _followCamera(location);
                           },
@@ -2066,70 +2100,5 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       ),
     );
     return result ?? false;
-  }
-}
-
-class _MapStateProxy extends ChangeNotifier {
-  _MapStateProxy(this._blocAccessor) {
-    _subscription = _blocAccessor().stream.listen((_) => notifyListeners());
-  }
-
-  final SpooferMapBloc Function() _blocAccessor;
-  late final StreamSubscription<SpooferMapState> _subscription;
-
-  SpooferMapState get _state => _blocAccessor().state;
-
-  LatLng? get currentPosition => _state.currentPosition;
-  LatLng? get lastInjectedPosition => _state.lastInjectedPosition;
-  Set<Polyline> get polylines => _state.polylines;
-  Set<Marker> get markers => _state.markers;
-  bool get autoFollow => _state.autoFollowEnabled;
-  bool get pendingFitRoute => _state.pendingFitRoute;
-  bool get isProgrammaticMove => _state.isProgrammaticMove;
-  bool? get lastMapStyleDark => _state.lastMapStyleDark;
-
-  void setCurrentPosition(LatLng? value, {bool updateLastInjected = false}) {
-    _blocAccessor().add(
-      SpooferMapCurrentPositionSetRequested(
-        position: value,
-        updateLastInjected: updateLastInjected,
-      ),
-    );
-  }
-
-  void setLastInjectedPosition(LatLng? value) {
-    _blocAccessor().add(
-      SpooferMapLastInjectedPositionSetRequested(position: value),
-    );
-  }
-
-  void setPolylines(Set<Polyline> value) {
-    _blocAccessor().add(SpooferMapPolylinesSetRequested(polylines: value));
-  }
-
-  void setMarkers(Set<Marker> value) {
-    _blocAccessor().add(SpooferMapMarkersSetRequested(markers: value));
-  }
-
-  void setAutoFollow(bool value) {
-    _blocAccessor().add(SpooferMapAutoFollowSetRequested(value: value));
-  }
-
-  void setPendingFitRoute(bool value) {
-    _blocAccessor().add(SpooferMapPendingFitRouteSetRequested(value: value));
-  }
-
-  void setProgrammaticMove(bool value) {
-    _blocAccessor().add(SpooferMapProgrammaticMoveSetRequested(value: value));
-  }
-
-  void setLastMapStyleDark(bool? value) {
-    _blocAccessor().add(SpooferMapLastMapStyleDarkSetRequested(value: value));
-  }
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
   }
 }

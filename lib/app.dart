@@ -42,7 +42,9 @@ class GpsSpooferApp extends StatelessWidget {
                 create: (_) => SpooferPlaybackBloc()..add(const SpooferPlaybackInitialized()),
               ),
               BlocProvider<SpooferMockBloc>(
-                create: (_) => SpooferMockBloc()..add(const SpooferMockInitialized()),
+                create: (_) => SpooferMockBloc(
+                  mockController: mockLocationController,
+                )..add(const SpooferMockInitialized()),
               ),
               BlocProvider<SpooferMapBloc>(
                 create: (_) => SpooferMapBloc()..add(const SpooferMapInitialized()),

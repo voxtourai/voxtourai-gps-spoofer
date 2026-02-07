@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/scheduler.dart' as scheduler;
-import 'package:flutter/services.dart';
 import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as flutter_local_notifications;
@@ -58,11 +57,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final SettingsController _settings = SettingsController();
   final PreferencesController _prefs = PreferencesController();
   final UiMessageController _messages = UiMessageController();
-  bool _startupChecksRunning = false;
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
   int _lastRouteMessageId = -1;
   int _lastMockMessageId = -1;
+  int _lastMockPromptId = -1;
   int _activePointers = 0;
   bool _userInteracting = false;
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
@@ -82,7 +81,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final accepted = await _ensureTosAccepted();
       if (accepted) {
-        unawaited(_runStartupChecks(showDialogs: true));
+        _requestStartupChecks(showDialogs: true);
       }
     });
   }
@@ -442,7 +441,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           'location ${_statusLabel(mockState.hasLocationPermission)} · '
           'dev ${_statusLabel(mockState.isDeveloperModeEnabled)} · '
           'mock ${_statusLabel(mockState.isMockLocationApp)}',
-      onRunSetupChecks: () => _runStartupChecks(showDialogs: true),
+      onRunSetupChecks: () => _requestStartupChecks(showDialogs: true),
       progressLabel: progressLabel,
       distanceLabel: distanceLabel,
       progress: _clamp01(routeState.progress),
@@ -565,18 +564,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
-  Future<void> _clearMockLocation() async {
-    try {
-      final result = await widget.mockController.clearMockLocation();
-      final mockBloc = context.read<SpooferMockBloc>();
-      mockBloc
-        ..add(SpooferMockStatusSetRequested(value: result))
-        ..add(const SpooferMockErrorClearedRequested());
-      _appendDebugLog('Cleared mock location.');
-    } on PlatformException catch (error) {
-      _messages.showSnack('Failed to clear mock location: ${error.message ?? error.code}');
-      _appendDebugLog('Clear mock failed: ${error.message ?? error.code}');
-    }
+  void _clearMockLocation() {
+    context.read<SpooferMockBloc>().add(const SpooferMockClearLocationRequested());
   }
 
   Future<LatLng?> _getRealLocation() async {
@@ -630,6 +619,31 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _lastMockMessageId = message.id;
       _messages.showSnack(message.text);
     }
+    final prompt = mockState.prompt;
+    if (prompt != null && prompt.id != _lastMockPromptId) {
+      _lastMockPromptId = prompt.id;
+      unawaited(_handleMockPrompt(prompt));
+    }
+  }
+
+  Future<void> _handleMockPrompt(SpooferMockStatePrompt prompt) async {
+    if (!mounted) {
+      return;
+    }
+    final accepted = await _confirmDialog(
+      prompt.title,
+      prompt.message,
+      prompt.actionLabel,
+    );
+    if (!mounted) {
+      return;
+    }
+    context.read<SpooferMockBloc>().add(
+          SpooferMockPromptResolved(
+            promptId: prompt.id,
+            accepted: accepted,
+          ),
+        );
   }
 
   void _handlePlaybackTick(SpooferPlaybackState playbackState) {
@@ -1577,43 +1591,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _sendMockLocation(LatLng position) async {
-    final mockBloc = context.read<SpooferMockBloc>();
     final speedMps = context.read<SpooferPlaybackBloc>().state.speedMps.abs();
-    final hadError = mockBloc.state.mockError != null;
-    try {
-      final result = await widget.mockController.setMockLocation(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracy: 3.0,
-        speedMps: speedMps,
-      );
-      mockBloc.add(SpooferMockStatusSetRequested(value: result));
-      final gpsApplied = result?['gpsApplied'] == true;
-      final mockAppSelected = result?['mockAppSelected'] == true;
-      final gpsError = result?['gpsError']?.toString();
-      final fusedError = result?['fusedError']?.toString();
-
-      if (!gpsApplied) {
-        final details = gpsError ?? fusedError ?? 'GPS mock not applied';
-        final hint = mockAppSelected ? 'Mock app set, but GPS mock failed.' : 'Select this app as mock location.';
-        final message = 'Mock GPS not applied: $details. $hint';
-        mockBloc.add(SpooferMockErrorSetRequested(message: message));
-        _appendDebugLog('Mock apply failed: $details');
-      } else if (mockBloc.state.mockError != null) {
-        mockBloc.add(const SpooferMockErrorClearedRequested());
-        if (hadError) {
-          _appendDebugLog('Mock apply ok.');
-        }
-      }
-    } on PlatformException catch (error) {
-      mockBloc.add(
-        SpooferMockErrorSetRequested(
-          message: 'Mock location failed: ${error.message ?? error.code}',
-          throttle: const Duration(seconds: 5),
-        ),
-      );
-      _appendDebugLog('Mock exception: ${error.message ?? error.code}');
-    }
+    context.read<SpooferMockBloc>().add(
+          SpooferMockApplyLocationRequested(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: 3.0,
+            speedMps: speedMps,
+          ),
+        );
   }
 
   LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
@@ -1794,104 +1780,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     return _tosAccepted;
   }
 
-  Future<void> _runStartupChecks({required bool showDialogs}) async {
-    if (_startupChecksRunning) {
-      return;
-    }
-    _startupChecksRunning = true;
-    final mockBloc = context.read<SpooferMockBloc>();
-    try {
-      final locationGranted = await _requestLocationPermission(showDialogs: showDialogs);
-      if (!locationGranted) {
-        return;
-      }
-
-      final devEnabled = await _isDeveloperModeEnabledNative();
-      mockBloc.add(SpooferMockDeveloperModeSetRequested(value: devEnabled));
-      if (!devEnabled) {
-        if (showDialogs) {
-          final open = await _confirmDialog(
-            'Enable Developer Options',
-            'Developer options must be enabled to select a mock location app.',
-            'Open Developer Options',
-          );
-          if (open) {
-            await _openDeveloperSettings();
-          }
-        }
-        return;
-      }
-
-      final isMockApp = await _isMockLocationAppNative();
-      mockBloc.add(SpooferMockLocationAppSetRequested(value: isMockApp));
-      if (!isMockApp && showDialogs) {
-        final open = await _confirmDialog(
-          'Select Mock Location App',
-          'Choose this app as the mock location provider.',
-          'Open Developer Options',
-        );
-        if (open) {
-          await _openDeveloperSettings();
-        }
-      }
-    } finally {
-      _startupChecksRunning = false;
-    }
-  }
-
-  Future<bool> _requestLocationPermission({required bool showDialogs}) async {
-    final status = await Permission.locationWhenInUse.request();
-    final granted = status.isGranted;
+  void _requestStartupChecks({required bool showDialogs}) {
     context.read<SpooferMockBloc>().add(
-          SpooferMockLocationPermissionSetRequested(value: granted),
+          SpooferMockStartupChecksRequested(showDialogs: showDialogs),
         );
-    if (granted) {
-      return true;
-    }
-
-    if (!showDialogs) {
-      return false;
-    }
-
-    final open = await _confirmDialog(
-      'Location Permission Required',
-      'Grant location permission so the mock GPS updates can be applied.',
-      'Open App Settings',
-    );
-    if (open) {
-      await openAppSettings();
-    }
-    return false;
   }
 
-  Future<bool> _isDeveloperModeEnabledNative() async {
-    try {
-      return await widget.mockController.isDeveloperModeEnabled();
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<bool> _isMockLocationAppNative() async {
-    try {
-      return await widget.mockController.isMockLocationApp();
-    } catch (_) {
-      return false;
-    }
-  }
-
-  Future<void> _refreshMockAppStatus() async {
-    try {
-      final selected = await widget.mockController.getMockLocationApp();
-      final isSelected = await _isMockLocationAppNative();
-      final mockBloc = context.read<SpooferMockBloc>();
-      mockBloc
-        ..add(SpooferMockSelectedAppSetRequested(value: selected))
-        ..add(SpooferMockLocationAppSetRequested(value: isSelected));
-      _appendDebugLog('Mock app: ${selected ?? '—'} selected=${isSelected ? 'YES' : 'NO'}');
-    } catch (_) {
-      // Ignore refresh failures.
-    }
+  void _refreshMockAppStatus() {
+    context.read<SpooferMockBloc>().add(const SpooferMockRefreshStatusRequested());
   }
 
   Future<void> _openSettingsSheet() async {
@@ -2090,7 +1986,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             textStyle: Theme.of(context).textTheme.bodySmall,
                           ),
                           onPressed: () async {
-                            await _clearMockLocation();
+                            _clearMockLocation();
                             await Future.delayed(const Duration(milliseconds: 400));
                             var location = await _getRealLocation();
                             if (location == null) {
@@ -2119,7 +2015,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           ),
                           onPressed: () {
                             Navigator.of(context).pop();
-                            _runStartupChecks(showDialogs: true);
+                            _requestStartupChecks(showDialogs: true);
                           },
                           icon: const Icon(Icons.check_circle_outline),
                           label: const Text('Run setup checks'),
@@ -2158,14 +2054,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         builder: (context) => HelpScreen(helpSections: helpSections),
       ),
     );
-  }
-
-  Future<void> _openDeveloperSettings() async {
-    try {
-      await widget.mockController.openDeveloperSettings();
-    } on PlatformException catch (error) {
-      _messages.showSnack('Failed to open developer settings: ${error.message ?? error.code}');
-    }
   }
 
   Future<bool> _confirmDialog(String title, String message, String actionLabel) async {

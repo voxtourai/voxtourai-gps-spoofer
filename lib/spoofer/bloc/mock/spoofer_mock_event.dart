@@ -64,3 +64,41 @@ class SpooferMockMessageRequested extends SpooferMockEvent {
 
   final String message;
 }
+
+class SpooferMockStartupChecksRequested extends SpooferMockEvent {
+  const SpooferMockStartupChecksRequested({required this.showDialogs});
+
+  final bool showDialogs;
+}
+
+class SpooferMockPromptResolved extends SpooferMockEvent {
+  const SpooferMockPromptResolved({
+    required this.promptId,
+    required this.accepted,
+  });
+
+  final int promptId;
+  final bool accepted;
+}
+
+class SpooferMockRefreshStatusRequested extends SpooferMockEvent {
+  const SpooferMockRefreshStatusRequested();
+}
+
+class SpooferMockApplyLocationRequested extends SpooferMockEvent {
+  const SpooferMockApplyLocationRequested({
+    required this.latitude,
+    required this.longitude,
+    required this.accuracy,
+    required this.speedMps,
+  });
+
+  final double latitude;
+  final double longitude;
+  final double accuracy;
+  final double speedMps;
+}
+
+class SpooferMockClearLocationRequested extends SpooferMockEvent {
+  const SpooferMockClearLocationRequested();
+}

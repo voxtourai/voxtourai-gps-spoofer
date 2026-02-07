@@ -3,11 +3,6 @@
 This file tracks the BLoC migration plan for the GPS spoofer app.
 As each chunk is implemented, remove that chunk from this file.
 
-## Chunk 4: Mock/setup/status migration
-- Move startup checks, setup checks, permission state, mock apply/clear, debug logs into `SpooferMockBloc`.
-- Use `BlocListener` for one-shot UI events (toasts/dialog triggers).
-- Goal: Setup and mock status features remain unchanged.
-
 ## Chunk 5: Map interaction migration
 - Move map tap/long-press/recenter/fit-route/autofollow events into `SpooferMapBloc`.
 - Move marker/polyline view-model generation into map bloc.

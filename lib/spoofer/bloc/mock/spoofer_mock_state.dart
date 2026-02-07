@@ -11,10 +11,34 @@ class SpooferMockStateMessage {
   final String text;
 }
 
+enum SpooferMockPromptType {
+  openAppSettings,
+  openDeveloperOptions,
+  selectMockLocationApp,
+}
+
+@immutable
+class SpooferMockStatePrompt {
+  const SpooferMockStatePrompt({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.message,
+    required this.actionLabel,
+  });
+
+  final int id;
+  final SpooferMockPromptType type;
+  final String title;
+  final String message;
+  final String actionLabel;
+}
+
 @immutable
 class SpooferMockState {
   const SpooferMockState({
     this.initialized = false,
+    this.startupChecksRunning = false,
     this.hasLocationPermission,
     this.isDeveloperModeEnabled,
     this.isMockLocationApp,
@@ -22,10 +46,12 @@ class SpooferMockState {
     this.selectedMockApp,
     this.mockError,
     this.debugLog = const <String>[],
+    this.prompt,
     this.message,
   });
 
   final bool initialized;
+  final bool startupChecksRunning;
   final bool? hasLocationPermission;
   final bool? isDeveloperModeEnabled;
   final bool? isMockLocationApp;
@@ -33,10 +59,12 @@ class SpooferMockState {
   final String? selectedMockApp;
   final String? mockError;
   final List<String> debugLog;
+  final SpooferMockStatePrompt? prompt;
   final SpooferMockStateMessage? message;
 
   SpooferMockState copyWith({
     bool? initialized,
+    bool? startupChecksRunning,
     bool? hasLocationPermission,
     bool clearLocationPermission = false,
     bool? isDeveloperModeEnabled,
@@ -50,11 +78,14 @@ class SpooferMockState {
     String? mockError,
     bool clearMockError = false,
     List<String>? debugLog,
+    SpooferMockStatePrompt? prompt,
+    bool clearPrompt = false,
     SpooferMockStateMessage? message,
     bool clearMessage = false,
   }) {
     return SpooferMockState(
       initialized: initialized ?? this.initialized,
+      startupChecksRunning: startupChecksRunning ?? this.startupChecksRunning,
       hasLocationPermission: clearLocationPermission
           ? null
           : (hasLocationPermission ?? this.hasLocationPermission),
@@ -66,6 +97,7 @@ class SpooferMockState {
       selectedMockApp: clearSelectedMockApp ? null : (selectedMockApp ?? this.selectedMockApp),
       mockError: clearMockError ? null : (mockError ?? this.mockError),
       debugLog: debugLog ?? this.debugLog,
+      prompt: clearPrompt ? null : (prompt ?? this.prompt),
       message: clearMessage ? null : (message ?? this.message),
     );
   }

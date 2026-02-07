@@ -1,11 +1,31 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../../../controllers/mock_location_controller.dart';
 
 import 'spoofer_mock_event.dart';
 import 'spoofer_mock_state.dart';
 
+typedef RequestLocationPermission = Future<bool> Function();
+typedef OpenAppSettingsAction = Future<bool> Function();
+
 class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
-  SpooferMockBloc() : super(const SpooferMockState()) {
+  SpooferMockBloc({
+    required MockLocationController mockController,
+    RequestLocationPermission? requestLocationPermission,
+    OpenAppSettingsAction? openAppSettingsAction,
+  })  : _mockController = mockController,
+        _requestLocationPermission =
+            requestLocationPermission ?? _defaultRequestLocationPermission,
+        _openAppSettingsAction = openAppSettingsAction ?? openAppSettings,
+        super(const SpooferMockState()) {
     on<SpooferMockInitialized>(_onInitialized);
+    on<SpooferMockStartupChecksRequested>(_onStartupChecksRequested);
+    on<SpooferMockPromptResolved>(_onPromptResolved);
+    on<SpooferMockRefreshStatusRequested>(_onRefreshStatusRequested);
+    on<SpooferMockApplyLocationRequested>(_onApplyLocationRequested);
+    on<SpooferMockClearLocationRequested>(_onClearLocationRequested);
     on<SpooferMockLocationPermissionSetRequested>(_onLocationPermissionSetRequested);
     on<SpooferMockDeveloperModeSetRequested>(_onDeveloperModeSetRequested);
     on<SpooferMockLocationAppSetRequested>(_onMockLocationAppSetRequested);
@@ -17,10 +37,20 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     on<SpooferMockMessageRequested>(_onMessageRequested);
   }
 
+  final MockLocationController _mockController;
+  final RequestLocationPermission _requestLocationPermission;
+  final OpenAppSettingsAction _openAppSettingsAction;
+
   int _messageId = 0;
+  int _promptId = 0;
   DateTime? _lastMockErrorAt;
   String? _lastDebugMessage;
   DateTime? _lastDebugAt;
+
+  static Future<bool> _defaultRequestLocationPermission() async {
+    final status = await Permission.locationWhenInUse.request();
+    return status.isGranted;
+  }
 
   void _onInitialized(
     SpooferMockInitialized event,
@@ -28,6 +58,197 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
   ) {
     if (!state.initialized) {
       emit(state.copyWith(initialized: true));
+    }
+  }
+
+  Future<void> _onStartupChecksRequested(
+    SpooferMockStartupChecksRequested event,
+    Emitter<SpooferMockState> emit,
+  ) async {
+    if (state.startupChecksRunning) {
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        startupChecksRunning: true,
+        clearPrompt: true,
+      ),
+    );
+
+    try {
+      final locationGranted = await _requestLocationPermission();
+      emit(state.copyWith(hasLocationPermission: locationGranted));
+      if (!locationGranted) {
+        if (event.showDialogs) {
+          emit(
+            state.copyWith(
+              prompt: SpooferMockStatePrompt(
+                id: ++_promptId,
+                type: SpooferMockPromptType.openAppSettings,
+                title: 'Location Permission Required',
+                message: 'Grant location permission so the mock GPS updates can be applied.',
+                actionLabel: 'Open App Settings',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final devEnabled = await _safeBool(_mockController.isDeveloperModeEnabled);
+      emit(state.copyWith(isDeveloperModeEnabled: devEnabled));
+      if (!devEnabled) {
+        if (event.showDialogs) {
+          emit(
+            state.copyWith(
+              prompt: SpooferMockStatePrompt(
+                id: ++_promptId,
+                type: SpooferMockPromptType.openDeveloperOptions,
+                title: 'Enable Developer Options',
+                message: 'Developer options must be enabled to select a mock location app.',
+                actionLabel: 'Open Developer Options',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final isMockApp = await _safeBool(_mockController.isMockLocationApp);
+      emit(state.copyWith(isMockLocationApp: isMockApp));
+      if (!isMockApp && event.showDialogs) {
+        emit(
+          state.copyWith(
+            prompt: SpooferMockStatePrompt(
+              id: ++_promptId,
+              type: SpooferMockPromptType.selectMockLocationApp,
+              title: 'Select Mock Location App',
+              message: 'Choose this app as the mock location provider.',
+              actionLabel: 'Open Developer Options',
+            ),
+          ),
+        );
+      }
+    } finally {
+      emit(state.copyWith(startupChecksRunning: false));
+    }
+  }
+
+  Future<void> _onPromptResolved(
+    SpooferMockPromptResolved event,
+    Emitter<SpooferMockState> emit,
+  ) async {
+    final prompt = state.prompt;
+    if (prompt == null || prompt.id != event.promptId) {
+      return;
+    }
+
+    emit(state.copyWith(clearPrompt: true));
+
+    if (!event.accepted) {
+      return;
+    }
+
+    try {
+      if (prompt.type == SpooferMockPromptType.openAppSettings) {
+        await _openAppSettingsAction();
+      } else {
+        await _mockController.openDeveloperSettings();
+      }
+    } on PlatformException catch (error) {
+      add(
+        SpooferMockMessageRequested(
+          message: 'Failed to open settings: ${error.message ?? error.code}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onRefreshStatusRequested(
+    SpooferMockRefreshStatusRequested event,
+    Emitter<SpooferMockState> emit,
+  ) async {
+    try {
+      final selected = await _mockController.getMockLocationApp();
+      final isSelected = await _safeBool(_mockController.isMockLocationApp);
+      emit(
+        state.copyWith(
+          selectedMockApp: selected,
+          isMockLocationApp: isSelected,
+        ),
+      );
+      add(
+        SpooferMockDebugLogAppended(
+          message: 'Mock app: ${selected ?? '—'} selected=${isSelected ? 'YES' : 'NO'}',
+        ),
+      );
+    } catch (_) {
+      // Ignore refresh failures.
+    }
+  }
+
+  Future<void> _onApplyLocationRequested(
+    SpooferMockApplyLocationRequested event,
+    Emitter<SpooferMockState> emit,
+  ) async {
+    final hadError = state.mockError != null;
+    try {
+      final result = await _mockController.setMockLocation(
+        latitude: event.latitude,
+        longitude: event.longitude,
+        accuracy: event.accuracy,
+        speedMps: event.speedMps,
+      );
+      emit(state.copyWith(lastMockStatus: result));
+
+      final gpsApplied = result?['gpsApplied'] == true;
+      final mockAppSelected = result?['mockAppSelected'] == true;
+      final gpsError = result?['gpsError']?.toString();
+      final fusedError = result?['fusedError']?.toString();
+
+      if (!gpsApplied) {
+        final details = gpsError ?? fusedError ?? 'GPS mock not applied';
+        final hint = mockAppSelected ? 'Mock app set, but GPS mock failed.' : 'Select this app as mock location.';
+        add(SpooferMockErrorSetRequested(message: 'Mock GPS not applied: $details. $hint'));
+        add(SpooferMockDebugLogAppended(message: 'Mock apply failed: $details'));
+      } else if (state.mockError != null) {
+        add(const SpooferMockErrorClearedRequested());
+        if (hadError) {
+          add(const SpooferMockDebugLogAppended(message: 'Mock apply ok.'));
+        }
+      }
+    } on PlatformException catch (error) {
+      add(
+        SpooferMockErrorSetRequested(
+          message: 'Mock location failed: ${error.message ?? error.code}',
+          throttle: const Duration(seconds: 5),
+        ),
+      );
+      add(SpooferMockDebugLogAppended(message: 'Mock exception: ${error.message ?? error.code}'));
+    }
+  }
+
+  Future<void> _onClearLocationRequested(
+    SpooferMockClearLocationRequested event,
+    Emitter<SpooferMockState> emit,
+  ) async {
+    try {
+      final result = await _mockController.clearMockLocation();
+      emit(
+        state.copyWith(
+          lastMockStatus: result,
+          clearMockError: true,
+        ),
+      );
+      add(const SpooferMockDebugLogAppended(message: 'Cleared mock location.'));
+    } on PlatformException catch (error) {
+      add(
+        SpooferMockMessageRequested(
+          message: 'Failed to clear mock location: ${error.message ?? error.code}',
+        ),
+      );
+      add(SpooferMockDebugLogAppended(message: 'Clear mock failed: ${error.message ?? error.code}'));
     }
   }
 
@@ -139,5 +360,13 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
         ),
       ),
     );
+  }
+
+  Future<bool> _safeBool(Future<bool> Function() callback) async {
+    try {
+      return await callback();
+    } catch (_) {
+      return false;
+    }
   }
 }

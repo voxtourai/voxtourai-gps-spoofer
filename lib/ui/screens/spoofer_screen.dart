@@ -16,12 +16,16 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/map_state_controller.dart';
-import '../../controllers/mock_status_controller.dart';
-import '../../controllers/playback_controller.dart';
 import '../../controllers/preferences_controller.dart';
 import '../../controllers/settings_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../controllers/ui_message_controller.dart';
+import '../../spoofer/bloc/mock/spoofer_mock_bloc.dart';
+import '../../spoofer/bloc/mock/spoofer_mock_event.dart';
+import '../../spoofer/bloc/mock/spoofer_mock_state.dart';
+import '../../spoofer/bloc/playback/spoofer_playback_bloc.dart';
+import '../../spoofer/bloc/playback/spoofer_playback_event.dart';
+import '../../spoofer/bloc/playback/spoofer_playback_state.dart';
 import '../../spoofer/bloc/route/spoofer_route_bloc.dart';
 import '../../spoofer/bloc/route/spoofer_route_event.dart';
 import '../../spoofer/bloc/route/spoofer_route_state.dart';
@@ -51,15 +55,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   GoogleMapController? _mapController;
   final MapStateController _mapState = MapStateController();
 
-  final PlaybackController _playback = PlaybackController();
   final SettingsController _settings = SettingsController();
   final PreferencesController _prefs = PreferencesController();
-  final MockStatusController _status = MockStatusController();
   final UiMessageController _messages = UiMessageController();
   bool _startupChecksRunning = false;
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
   int _lastRouteMessageId = -1;
+  int _lastMockMessageId = -1;
   int _activePointers = 0;
   bool _userInteracting = false;
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
@@ -89,10 +92,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.removeObserver(this);
     _overlayMessage?.remove();
     _overlayMessage = null;
-    _playback.dispose();
     _mapState.dispose();
     _settings.dispose();
-    _status.dispose();
     _messages.removeListener(_handleUiMessage);
     _messages.dispose();
     unawaited(_cancelBackgroundNotification());
@@ -110,16 +111,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
       return;
     }
+    final playbackBloc = context.read<SpooferPlaybackBloc>();
     if (state == AppLifecycleState.resumed) {
-      if (_playback.resumeAfterPause) {
-        _playback.setResumeAfterPause(false);
-        _startPlayback();
-      }
+      playbackBloc.add(const SpooferPlaybackAppResumed());
     } else {
-      if (_playback.isPlaying) {
-        _playback.setResumeAfterPause(true);
-        _stopPlayback();
-      }
+      playbackBloc.add(const SpooferPlaybackAppPaused());
     }
   }
 
@@ -169,243 +165,271 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<SpooferRouteBloc, SpooferRouteState>(
-      listener: (context, routeState) => _handleRouteBlocState(routeState),
-      builder: (context, routeState) {
-        return AnimatedBuilder(
-          animation: Listenable.merge([_settings, _status]),
-          builder: (context, _) {
-            return Scaffold(
-              appBar: AppBar(
-                toolbarHeight: 48,
-                title: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _handleTitleTap,
-                  child: const Text('GPS Spoofer'),
-                ),
-                actions: [
-                  IconButton(
-                    tooltip: 'Search',
-                    icon: const Icon(Icons.search),
-                    onPressed: _openSearchScreen,
-                  ),
-                  IconButton(
-                    tooltip: 'Help',
-                    icon: const Icon(Icons.help_outline),
-                    onPressed: _openHelpScreen,
-                  ),
-                  IconButton(
-                    tooltip: 'Settings',
-                    icon: const Icon(Icons.settings),
-                    onPressed: _openSettingsSheet,
-                  ),
-                ],
-              ),
-              body: Column(
-                children: [
-                  Expanded(
-                    flex: 15,
-                    child: Stack(
-                      children: [
-                        AnimatedBuilder(
-                          animation: _mapState,
-                          builder: (context, _) {
-                            return Listener(
-                              onPointerDown: (_) {
-                                _activePointers += 1;
-                                _userInteracting = true;
-                              },
-                              onPointerUp: (_) {
-                                _activePointers = math.max(0, _activePointers - 1);
-                                if (_activePointers == 0) {
-                                  _userInteracting = false;
-                                }
-                              },
-                              onPointerCancel: (_) {
-                                _activePointers = 0;
-                                _userInteracting = false;
-                              },
-                              child: GoogleMap(
-                                key: ValueKey(
-                                  'map-${_status.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
-                                ),
-                                initialCameraPosition: CameraPosition(
-                                  target: _mapState.currentPosition ?? const LatLng(0, 0),
-                                  zoom: _mapState.currentPosition == null ? 2 : 16,
-                                ),
-                                onMapCreated: _onMapCreated,
-                                onCameraMoveStarted: () {
-                                  if (_userInteracting) {
-                                    if (_mapState.autoFollow) {
-                                      _mapState.setAutoFollow(false);
-                                    }
-                                    if (_mapState.isProgrammaticMove) {
-                                      _mapState.setProgrammaticMove(false);
-                                    }
-                                    return;
-                                  }
-                                  if (_mapState.isProgrammaticMove) {
-                                    return;
-                                  }
-                                },
-                                onCameraMove: (_) {
-                                  if (_userInteracting && _mapState.autoFollow) {
-                                    _mapState.setAutoFollow(false);
-                                  }
-                                },
-                                onCameraIdle: () {
-                                  if (_mapState.isProgrammaticMove) {
-                                    _mapState.setProgrammaticMove(false);
-                                  }
-                                },
-                                onTap: (position) {
-                                  if (routeState.selectedWaypointIndex != null) {
-                                    context.read<SpooferRouteBloc>().add(
-                                          const SpooferRouteWaypointSelectedRequested(index: null),
-                                        );
-                                    return;
-                                  }
-                                  if (routeState.hasPoints || routeState.hasWaypointPoints) {
-                                    return;
-                                  }
-                                  _setManualLocation(position);
-                                },
-                                onLongPress: (position) {
-                                  if (routeState.hasPoints && !routeState.usingCustomRoute) {
-                                    _messages.showSnack('Clear the loaded route to add points.');
-                                    return;
-                                  }
-                                  _addCustomPoint(position);
-                                },
-                                markers: _mapState.markers,
-                                polylines: _mapState.polylines,
-                                mapToolbarEnabled: false,
-                                padding: _mapPaddingForCamera(context),
-                                myLocationEnabled: _status.hasLocationPermission == true,
-                                myLocationButtonEnabled: false,
-                                zoomControlsEnabled: false,
-                              ),
-                            );
-                          },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<SpooferRouteBloc, SpooferRouteState>(
+          listener: (context, routeState) => _handleRouteBlocState(routeState),
+        ),
+        BlocListener<SpooferPlaybackBloc, SpooferPlaybackState>(
+          listenWhen: (previous, current) => previous.tickSequence != current.tickSequence,
+          listener: (context, playbackState) => _handlePlaybackTick(playbackState),
+        ),
+        BlocListener<SpooferMockBloc, SpooferMockState>(
+          listener: (context, mockState) => _handleMockBlocState(mockState),
+        ),
+      ],
+      child: BlocBuilder<SpooferRouteBloc, SpooferRouteState>(
+        builder: (context, routeState) {
+          return BlocBuilder<SpooferPlaybackBloc, SpooferPlaybackState>(
+            builder: (context, playbackState) {
+              return BlocBuilder<SpooferMockBloc, SpooferMockState>(
+                builder: (context, mockState) {
+                  return AnimatedBuilder(
+                    animation: _settings,
+                    builder: (context, _) {
+                  return Scaffold(
+                    appBar: AppBar(
+                      toolbarHeight: 48,
+                      title: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _handleTitleTap,
+                        child: const Text('GPS Spoofer'),
+                      ),
+                      actions: [
+                        IconButton(
+                          tooltip: 'Search',
+                          icon: const Icon(Icons.search),
+                          onPressed: _openSearchScreen,
                         ),
-                        AnimatedBuilder(
-                          animation: Listenable.merge([_playback, _mapState]),
-                          builder: (context, _) {
-                            final hasRoute = routeState.hasRoute;
-                            final bottomInset = MediaQuery.of(context).padding.bottom;
-                            final controlsVisible = routeState.hasRoute;
-                            final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
+                        IconButton(
+                          tooltip: 'Help',
+                          icon: const Icon(Icons.help_outline),
+                          onPressed: _openHelpScreen,
+                        ),
+                        IconButton(
+                          tooltip: 'Settings',
+                          icon: const Icon(Icons.settings),
+                          onPressed: _openSettingsSheet,
+                        ),
+                      ],
+                    ),
+                    body: Column(
+                      children: [
+                        Expanded(
+                          flex: 15,
+                          child: Stack(
+                            children: [
+                              AnimatedBuilder(
+                                animation: _mapState,
+                                builder: (context, _) {
+                                  return Listener(
+                                    onPointerDown: (_) {
+                                      _activePointers += 1;
+                                      _userInteracting = true;
+                                    },
+                                    onPointerUp: (_) {
+                                      _activePointers = math.max(0, _activePointers - 1);
+                                      if (_activePointers == 0) {
+                                        _userInteracting = false;
+                                      }
+                                    },
+                                    onPointerCancel: (_) {
+                                      _activePointers = 0;
+                                      _userInteracting = false;
+                                    },
+                                    child: GoogleMap(
+                                      key: ValueKey(
+                                        'map-${mockState.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
+                                      ),
+                                      initialCameraPosition: CameraPosition(
+                                        target: _mapState.currentPosition ?? const LatLng(0, 0),
+                                        zoom: _mapState.currentPosition == null ? 2 : 16,
+                                      ),
+                                      onMapCreated: _onMapCreated,
+                                      onCameraMoveStarted: () {
+                                        if (_userInteracting) {
+                                          if (_mapState.autoFollow) {
+                                            _mapState.setAutoFollow(false);
+                                          }
+                                          if (_mapState.isProgrammaticMove) {
+                                            _mapState.setProgrammaticMove(false);
+                                          }
+                                          return;
+                                        }
+                                        if (_mapState.isProgrammaticMove) {
+                                          return;
+                                        }
+                                      },
+                                      onCameraMove: (_) {
+                                        if (_userInteracting && _mapState.autoFollow) {
+                                          _mapState.setAutoFollow(false);
+                                        }
+                                      },
+                                      onCameraIdle: () {
+                                        if (_mapState.isProgrammaticMove) {
+                                          _mapState.setProgrammaticMove(false);
+                                        }
+                                      },
+                                      onTap: (position) {
+                                        if (routeState.selectedWaypointIndex != null) {
+                                          context.read<SpooferRouteBloc>().add(
+                                                const SpooferRouteWaypointSelectedRequested(index: null),
+                                              );
+                                          return;
+                                        }
+                                        if (routeState.hasPoints || routeState.hasWaypointPoints) {
+                                          return;
+                                        }
+                                        _setManualLocation(position);
+                                      },
+                                      onLongPress: (position) {
+                                        if (routeState.hasPoints && !routeState.usingCustomRoute) {
+                                          _messages.showSnack('Clear the loaded route to add points.');
+                                          return;
+                                        }
+                                        _addCustomPoint(position);
+                                      },
+                                      markers: _mapState.markers,
+                                      polylines: _mapState.polylines,
+                                      mapToolbarEnabled: false,
+                                      padding: _mapPaddingForCamera(context),
+                                      myLocationEnabled: mockState.hasLocationPermission == true,
+                                      myLocationButtonEnabled: false,
+                                      zoomControlsEnabled: false,
+                                    ),
+                                  );
+                                },
+                              ),
+                              AnimatedBuilder(
+                                animation: _mapState,
+                                builder: (context, _) {
+                                  final hasRoute = routeState.hasRoute;
+                                  final bottomInset = MediaQuery.of(context).padding.bottom;
+                                  final controlsVisible = routeState.hasRoute;
+                                  final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
 
-                            return Stack(
-                              children: [
-                                Positioned(
-                                  right: 12,
-                                  top: 12,
-                                  child: MapActionButtons(
-                                    hasRoute: hasRoute,
-                                    hasPoints: routeState.hasPoints,
-                                    isPlaying: _playback.isPlaying,
-                                    showWaypoints: !(routeState.hasRoute && !routeState.usingCustomRoute),
-                                    onLoadOrClear: routeState.hasPoints ? _clearRoute : _openRouteInputSheet,
-                                    onTogglePlayback: hasRoute ? _togglePlayback : null,
-                                    onOpenWaypoints: _openWaypointList,
-                                  ),
-                                ),
-                                Positioned(
-                                  right: 12,
-                                  bottom: overlayBottom,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
+                                  return Stack(
                                     children: [
-                                      if (hasRoute) ...[
-                                        FloatingActionButton.small(
-                                          heroTag: 'fitRoute',
-                                          onPressed: () {
-                                            _fitRouteToMap();
-                                            _messages.showOverlay('Map fit to route');
-                                          },
-                                          tooltip: 'Fit route',
-                                          child: const Icon(Icons.fit_screen),
-                                        ),
-                                        const SizedBox(height: 8),
-                                      ],
-                                      FloatingActionButton.small(
-                                        heroTag: 'recenter',
-                                        onPressed: _mapState.currentPosition == null
-                                            ? null
-                                            : () {
-                                                final wasAutoFollow = _mapState.autoFollow;
-                                                _mapState.setAutoFollow(true);
-                                                _followCamera(_mapState.currentPosition!);
-                                                if (!wasAutoFollow) {
-                                                  _messages.showOverlay('Auto-follow enabled');
-                                                }
-                                              },
-                                        tooltip: 'Recenter',
-                                        child: Icon(
-                                          _mapState.autoFollow ? Icons.my_location : Icons.center_focus_strong,
+                                      Positioned(
+                                        right: 12,
+                                        top: 12,
+                                        child: MapActionButtons(
+                                          hasRoute: hasRoute,
+                                          hasPoints: routeState.hasPoints,
+                                          isPlaying: playbackState.isPlaying,
+                                          showWaypoints: !(routeState.hasRoute && !routeState.usingCustomRoute),
+                                          onLoadOrClear: routeState.hasPoints ? _clearRoute : _openRouteInputSheet,
+                                          onTogglePlayback: hasRoute ? _togglePlayback : null,
+                                          onOpenWaypoints: _openWaypointList,
                                         ),
                                       ),
+                                      Positioned(
+                                        right: 12,
+                                        bottom: overlayBottom,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (hasRoute) ...[
+                                              FloatingActionButton.small(
+                                                heroTag: 'fitRoute',
+                                                onPressed: () {
+                                                  _fitRouteToMap();
+                                                  _messages.showOverlay('Map fit to route');
+                                                },
+                                                tooltip: 'Fit route',
+                                                child: const Icon(Icons.fit_screen),
+                                              ),
+                                              const SizedBox(height: 8),
+                                            ],
+                                            FloatingActionButton.small(
+                                              heroTag: 'recenter',
+                                              onPressed: _mapState.currentPosition == null
+                                                  ? null
+                                                  : () {
+                                                      final wasAutoFollow = _mapState.autoFollow;
+                                                      _mapState.setAutoFollow(true);
+                                                      _followCamera(_mapState.currentPosition!);
+                                                      if (!wasAutoFollow) {
+                                                        _messages.showOverlay('Auto-follow enabled');
+                                                      }
+                                                    },
+                                              tooltip: 'Recenter',
+                                              child: Icon(
+                                                _mapState.autoFollow
+                                                    ? Icons.my_location
+                                                    : Icons.center_focus_strong,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (routeState.selectedWaypointIndex != null)
+                                        Positioned(
+                                          left: 12,
+                                          right: 72,
+                                          bottom: overlayBottom,
+                                          child: WaypointActionRow(
+                                            onRename: () {
+                                              final idx = routeState.selectedWaypointIndex;
+                                              if (idx != null) {
+                                                _renameCustomPoint(idx);
+                                              }
+                                            },
+                                            onDelete: () {
+                                              final idx = routeState.selectedWaypointIndex;
+                                              if (idx != null) {
+                                                _removeCustomPoint(idx);
+                                              }
+                                            },
+                                          ),
+                                        ),
                                     ],
-                                  ),
-                                ),
-                                if (routeState.selectedWaypointIndex != null)
-                                  Positioned(
-                                    left: 12,
-                                    right: 72,
-                                    bottom: overlayBottom,
-                                    child: WaypointActionRow(
-                                      onRename: () {
-                                        final idx = routeState.selectedWaypointIndex;
-                                        if (idx != null) {
-                                          _renameCustomPoint(idx);
-                                        }
-                                      },
-                                      onDelete: () {
-                                        final idx = routeState.selectedWaypointIndex;
-                                        if (idx != null) {
-                                          _removeCustomPoint(idx);
-                                        }
-                                      },
-                                    ),
-                                  ),
-                              ],
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        AnimatedBuilder(
+                          animation: _settings,
+                          builder: (context, _) {
+                            return AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              transitionBuilder: (child, animation) => SizeTransition(
+                                sizeFactor: animation,
+                                axisAlignment: -1,
+                                child: FadeTransition(opacity: animation, child: child),
+                              ),
+                              child: routeState.hasRoute
+                                  ? SafeArea(
+                                      key: const ValueKey('controls'),
+                                      top: false,
+                                      child: _buildControls(context, routeState, playbackState, mockState),
+                                    )
+                                  : const SizedBox.shrink(key: ValueKey('no-controls')),
                             );
                           },
                         ),
                       ],
                     ),
-                  ),
-                  AnimatedBuilder(
-                    animation: Listenable.merge([_playback, _settings, _status]),
-                    builder: (context, _) {
-                      return AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        transitionBuilder: (child, animation) => SizeTransition(
-                          sizeFactor: animation,
-                          axisAlignment: -1,
-                          child: FadeTransition(opacity: animation, child: child),
-                        ),
-                        child: routeState.hasRoute
-                            ? SafeArea(
-                                key: const ValueKey('controls'),
-                                top: false,
-                                child: _buildControls(context, routeState),
-                              )
-                            : const SizedBox.shrink(key: ValueKey('no-controls')),
-                      );
+                  );
                     },
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildControls(BuildContext context, SpooferRouteState routeState) {
+  Widget _buildControls(
+    BuildContext context,
+    SpooferRouteState routeState,
+    SpooferPlaybackState playbackState,
+    SpooferMockState mockState,
+  ) {
     final bool hasRoute = routeState.hasRoute;
     final progressLabel = '${(routeState.progress * 100).toStringAsFixed(0)}%';
     final distanceLabel = routeState.totalDistanceMeters > 0
@@ -415,22 +439,26 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     return ControlsPanel(
       showSetupBar: _settings.showSetupBar,
       setupLabel: 'Setup: '
-          'location ${_statusLabel(_status.hasLocationPermission)} · '
-          'dev ${_statusLabel(_status.isDeveloperModeEnabled)} · '
-          'mock ${_statusLabel(_status.isMockLocationApp)}',
+          'location ${_statusLabel(mockState.hasLocationPermission)} · '
+          'dev ${_statusLabel(mockState.isDeveloperModeEnabled)} · '
+          'mock ${_statusLabel(mockState.isMockLocationApp)}',
       onRunSetupChecks: () => _runStartupChecks(showDialogs: true),
       progressLabel: progressLabel,
       distanceLabel: distanceLabel,
       progress: _clamp01(routeState.progress),
       onProgressChanged: hasRoute
           ? (value) {
-              _playback.markTick();
+              context.read<SpooferPlaybackBloc>().add(const SpooferPlaybackTickClockResetRequested());
               _setProgress(value);
             }
           : null,
-      speedMps: _playback.speedMps,
-      onSpeedChanged: (value) => _playback.speedMps = value,
-      mockError: _status.mockError,
+      speedMps: playbackState.speedMps,
+      onSpeedChanged: (value) {
+        context.read<SpooferPlaybackBloc>().add(
+              SpooferPlaybackSpeedSetRequested(speedMps: value),
+            );
+      },
+      mockError: mockState.mockError,
     );
   }
 
@@ -540,8 +568,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<void> _clearMockLocation() async {
     try {
       final result = await widget.mockController.clearMockLocation();
-      _status.setLastMockStatus(result);
-      _status.clearMockError();
+      final mockBloc = context.read<SpooferMockBloc>();
+      mockBloc
+        ..add(SpooferMockStatusSetRequested(value: result))
+        ..add(const SpooferMockErrorClearedRequested());
       _appendDebugLog('Cleared mock location.');
     } on PlatformException catch (error) {
       _messages.showSnack('Failed to clear mock location: ${error.message ?? error.code}');
@@ -559,7 +589,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _clearRoute() async {
     final routeState = context.read<SpooferRouteBloc>().state;
-    if (_playback.isPlaying && routeState.hasRoute) {
+    final playbackState = context.read<SpooferPlaybackBloc>().state;
+    if (playbackState.isPlaying && routeState.hasRoute) {
       final confirm = await _confirmDialog(
         'Clear route?',
         'Playback is running. Clear the route and stop playback?',
@@ -577,7 +608,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _appendDebugLog(String message) {
-    _status.appendDebugLog(message);
+    context.read<SpooferMockBloc>().add(SpooferMockDebugLogAppended(message: message));
   }
 
   void _handleRouteBlocState(SpooferRouteState routeState) {
@@ -586,8 +617,46 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _lastRouteMessageId = message.id;
       _messages.showSnack(message.text);
     }
+    if (!routeState.hasRoute && context.read<SpooferPlaybackBloc>().state.isPlaying) {
+      _stopPlayback();
+    }
     _mapState.setPolylines(_buildRoutePolylines(routeState.routePoints));
     _refreshMarkers(routeState);
+  }
+
+  void _handleMockBlocState(SpooferMockState mockState) {
+    final message = mockState.message;
+    if (message != null && message.id != _lastMockMessageId) {
+      _lastMockMessageId = message.id;
+      _messages.showSnack(message.text);
+    }
+  }
+
+  void _handlePlaybackTick(SpooferPlaybackState playbackState) {
+    if (!playbackState.isPlaying) {
+      return;
+    }
+    final deltaSeconds = playbackState.tickDeltaSeconds;
+    if (deltaSeconds == null) {
+      return;
+    }
+    final routeState = context.read<SpooferRouteBloc>().state;
+    if (!routeState.hasRoute) {
+      _stopPlayback();
+      return;
+    }
+    final nextDistance = routeState.progressDistance + playbackState.speedMps * deltaSeconds;
+    if (nextDistance >= routeState.totalDistanceMeters) {
+      _setProgress(1);
+      _stopPlayback();
+      return;
+    }
+    if (nextDistance <= 0) {
+      _setProgress(0);
+      _stopPlayback();
+      return;
+    }
+    _setProgress(nextDistance / routeState.totalDistanceMeters);
   }
 
   Set<Polyline> _buildRoutePolylines(List<LatLng> points) {
@@ -698,8 +767,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
-  Widget _buildDebugPanel(BuildContext context) {
-    final status = _status.lastMockStatus;
+  Widget _buildDebugPanel(BuildContext context, SpooferMockState mockState) {
+    final status = mockState.lastMockStatus;
     final theme = Theme.of(context);
     if (!_settings.showDebugPanel) {
       return const SizedBox.shrink();
@@ -720,11 +789,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             style: theme.textTheme.bodySmall,
           ),
           Text(
-            'Mock app selected: ${_status.isMockLocationApp == null ? '—' : _status.isMockLocationApp == true ? 'YES' : 'NO'}',
+            'Mock app selected: ${mockState.isMockLocationApp == null ? '—' : mockState.isMockLocationApp == true ? 'YES' : 'NO'}',
             style: theme.textTheme.bodySmall,
           ),
           Text(
-            'Selected package: ${_status.selectedMockApp ?? '—'}',
+            'Selected package: ${mockState.selectedMockApp ?? '—'}',
             style: theme.textTheme.bodySmall,
           ),
           Text(
@@ -777,10 +846,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               borderRadius: BorderRadius.circular(6),
             ),
             constraints: const BoxConstraints(maxHeight: 220),
-            child: _status.debugLog.isEmpty
+            child: mockState.debugLog.isEmpty
                 ? Text('No debug events yet.', style: theme.textTheme.bodySmall)
                 : SingleChildScrollView(
-                    child: Text(_status.debugLog.join('\n'), style: theme.textTheme.bodySmall),
+                    child: Text(mockState.debugLog.join('\n'), style: theme.textTheme.bodySmall),
                   ),
           ),
           const SizedBox(height: 4),
@@ -1008,7 +1077,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _togglePlayback() {
-    if (_playback.isPlaying) {
+    if (context.read<SpooferPlaybackBloc>().state.isPlaying) {
       _stopPlayback();
     } else {
       _startPlayback();
@@ -1021,43 +1090,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (!routeState.hasRoute || routeState.totalDistanceMeters == 0) {
       return;
     }
-    _playback.start(_onTick);
+    context.read<SpooferPlaybackBloc>().add(const SpooferPlaybackPlayRequested());
   }
 
   void _stopPlayback() {
-    if (!_playback.isPlaying) {
+    if (!context.read<SpooferPlaybackBloc>().state.isPlaying) {
       return;
     }
-    _playback.stop();
-  }
-
-  void _onTick() {
-    final routeState = context.read<SpooferRouteBloc>().state;
-    if (!_playback.isPlaying || !routeState.hasRoute) {
-      return;
-    }
-
-    final deltaSeconds = _playback.consumeDeltaSeconds();
-    if (deltaSeconds == null) {
-      return;
-    }
-
-    final speedMps = _playback.speedMps;
-    final currentDistance = routeState.progressDistance;
-    final nextDistance = currentDistance + speedMps * deltaSeconds;
-
-    if (nextDistance >= routeState.totalDistanceMeters) {
-      _setProgress(1);
-      _stopPlayback();
-      return;
-    }
-    if (nextDistance <= 0) {
-      _setProgress(0);
-      _stopPlayback();
-      return;
-    }
-
-    _setProgress(nextDistance / routeState.totalDistanceMeters);
+    context.read<SpooferPlaybackBloc>().add(const SpooferPlaybackPauseRequested());
   }
 
   void _setProgress(double value) {
@@ -1537,8 +1577,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _sendMockLocation(LatLng position) async {
-    final speedMps = _playback.speedMps.abs();
-    final hadError = _status.mockError != null;
+    final mockBloc = context.read<SpooferMockBloc>();
+    final speedMps = context.read<SpooferPlaybackBloc>().state.speedMps.abs();
+    final hadError = mockBloc.state.mockError != null;
     try {
       final result = await widget.mockController.setMockLocation(
         latitude: position.latitude,
@@ -1546,7 +1587,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         accuracy: 3.0,
         speedMps: speedMps,
       );
-      _status.setLastMockStatus(result);
+      mockBloc.add(SpooferMockStatusSetRequested(value: result));
       final gpsApplied = result?['gpsApplied'] == true;
       final mockAppSelected = result?['mockAppSelected'] == true;
       final gpsError = result?['gpsError']?.toString();
@@ -1556,19 +1597,22 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         final details = gpsError ?? fusedError ?? 'GPS mock not applied';
         final hint = mockAppSelected ? 'Mock app set, but GPS mock failed.' : 'Select this app as mock location.';
         final message = 'Mock GPS not applied: $details. $hint';
-        _status.setMockError(message);
+        mockBloc.add(SpooferMockErrorSetRequested(message: message));
         _appendDebugLog('Mock apply failed: $details');
-      } else if (_status.mockError != null) {
-        _status.clearMockError();
+      } else if (mockBloc.state.mockError != null) {
+        mockBloc.add(const SpooferMockErrorClearedRequested());
         if (hadError) {
           _appendDebugLog('Mock apply ok.');
         }
       }
     } on PlatformException catch (error) {
-      if (_status.shouldReportMockError(const Duration(seconds: 5))) {
-        _status.setMockError('Mock location failed: ${error.message ?? error.code}');
-        _appendDebugLog('Mock exception: ${error.message ?? error.code}');
-      }
+      mockBloc.add(
+        SpooferMockErrorSetRequested(
+          message: 'Mock location failed: ${error.message ?? error.code}',
+          throttle: const Duration(seconds: 5),
+        ),
+      );
+      _appendDebugLog('Mock exception: ${error.message ?? error.code}');
     }
   }
 
@@ -1755,6 +1799,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     _startupChecksRunning = true;
+    final mockBloc = context.read<SpooferMockBloc>();
     try {
       final locationGranted = await _requestLocationPermission(showDialogs: showDialogs);
       if (!locationGranted) {
@@ -1762,7 +1807,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
 
       final devEnabled = await _isDeveloperModeEnabledNative();
-      _status.setDeveloperModeEnabled(devEnabled);
+      mockBloc.add(SpooferMockDeveloperModeSetRequested(value: devEnabled));
       if (!devEnabled) {
         if (showDialogs) {
           final open = await _confirmDialog(
@@ -1778,7 +1823,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       }
 
       final isMockApp = await _isMockLocationAppNative();
-      _status.setMockLocationApp(isMockApp);
+      mockBloc.add(SpooferMockLocationAppSetRequested(value: isMockApp));
       if (!isMockApp && showDialogs) {
         final open = await _confirmDialog(
           'Select Mock Location App',
@@ -1797,7 +1842,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<bool> _requestLocationPermission({required bool showDialogs}) async {
     final status = await Permission.locationWhenInUse.request();
     final granted = status.isGranted;
-    _status.setLocationPermission(granted);
+    context.read<SpooferMockBloc>().add(
+          SpooferMockLocationPermissionSetRequested(value: granted),
+        );
     if (granted) {
       return true;
     }
@@ -1837,8 +1884,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     try {
       final selected = await widget.mockController.getMockLocationApp();
       final isSelected = await _isMockLocationAppNative();
-      _status.setSelectedMockApp(selected);
-      _status.setMockLocationApp(isSelected);
+      final mockBloc = context.read<SpooferMockBloc>();
+      mockBloc
+        ..add(SpooferMockSelectedAppSetRequested(value: selected))
+        ..add(SpooferMockLocationAppSetRequested(value: isSelected));
       _appendDebugLog('Mock app: ${selected ?? '—'} selected=${isSelected ? 'YES' : 'NO'}');
     } catch (_) {
       // Ignore refresh failures.
@@ -2079,7 +2128,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                           const Divider(height: 16),
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: _buildDebugPanel(context),
+                            child: _buildDebugPanel(context, context.watch<SpooferMockBloc>().state),
                           ),
                         ],
                       ],

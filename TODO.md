@@ -3,11 +3,6 @@
 This file tracks the BLoC migration plan for the GPS spoofer app.
 As each chunk is implemented, remove that chunk from this file.
 
-## Chunk 3: Playback migration
-- Move play/pause/speed/tick logic into `SpooferPlaybackBloc`.
-- Dispatch tick events from bloc-managed timer.
-- Goal: Slider + play behavior remains unchanged.
-
 ## Chunk 4: Mock/setup/status migration
 - Move startup checks, setup checks, permission state, mock apply/clear, debug logs into `SpooferMockBloc`.
 - Use `BlocListener` for one-shot UI events (toasts/dialog triggers).

@@ -3,13 +3,6 @@
 This file tracks the BLoC migration plan for the GPS spoofer app.
 As each chunk is implemented, remove that chunk from this file.
 
-## Chunk 6: Cross-bloc coordination
-- Define explicit coordination points:
-  - route + playback -> target position
-  - position -> mock apply + map follow
-- Keep first pass in screen listeners, then move to a small coordinator service if needed.
-- Goal: No regressions in auto-follow, playback, manual/search set.
-
 ## Chunk 7: Controller retirement
 - Remove legacy `ChangeNotifier` controllers that are fully replaced.
 - Remove dead widget state and unused helper methods.

@@ -30,6 +30,7 @@ import '../../spoofer/bloc/playback/spoofer_playback_state.dart';
 import '../../spoofer/bloc/route/spoofer_route_bloc.dart';
 import '../../spoofer/bloc/route/spoofer_route_event.dart';
 import '../../spoofer/bloc/route/spoofer_route_state.dart';
+import '../../spoofer/coordinator/spoofer_runtime_coordinator.dart';
 import '../map/map_style.dart';
 import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
@@ -59,6 +60,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final SettingsController _settings = SettingsController();
   final PreferencesController _prefs = PreferencesController();
   final UiMessageController _messages = UiMessageController();
+  final SpooferRuntimeCoordinator _coordinator = const SpooferRuntimeCoordinator();
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
   int _lastRouteMessageId = -1;
@@ -653,27 +655,28 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (!playbackState.isPlaying) {
       return;
     }
-    final deltaSeconds = playbackState.tickDeltaSeconds;
-    if (deltaSeconds == null) {
-      return;
-    }
     final routeState = context.read<SpooferRouteBloc>().state;
-    if (!routeState.hasRoute) {
-      _stopPlayback();
+    final resolution = _coordinator.resolvePlaybackTick(
+      routeState: routeState,
+      playbackState: playbackState,
+    );
+    if (resolution == null) {
+      if (!routeState.hasRoute) {
+        _stopPlayback();
+      }
       return;
     }
-    final nextDistance = routeState.progressDistance + playbackState.speedMps * deltaSeconds;
-    if (nextDistance >= routeState.totalDistanceMeters) {
+    if (resolution.boundary == PlaybackBoundary.end) {
       _setProgress(1);
       _stopPlayback();
       return;
     }
-    if (nextDistance <= 0) {
+    if (resolution.boundary == PlaybackBoundary.start) {
       _setProgress(0);
       _stopPlayback();
       return;
     }
-    _setProgress(nextDistance / routeState.totalDistanceMeters);
+    _setProgress(resolution.progress);
   }
 
   Set<Polyline> _buildRoutePolylines(List<LatLng> points) {
@@ -1124,7 +1127,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
 
     final clamped = _clamp01(value);
-    final position = _positionForProgress(routeState, clamped) ?? routeState.routePoints.first;
+    final position = _coordinator.positionForProgress(routeState, clamped) ?? routeState.routePoints.first;
     context.read<SpooferRouteBloc>().add(SpooferRouteProgressSetRequested(progress: clamped));
 
     _mapState.setCurrentPosition(position, updateLastInjected: true);
@@ -1132,54 +1135,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     unawaited(_sendMockLocation(position));
     _followCamera(position);
   }
-
-  LatLng? _positionForProgress(SpooferRouteState routeState, double progress) {
-    final points = routeState.routePoints;
-    if (points.isEmpty) {
-      return null;
-    }
-    if (points.length == 1 || routeState.totalDistanceMeters <= 0) {
-      return points.first;
-    }
-
-    final clampedProgress = _clamp01(progress);
-    final targetMeters = routeState.totalDistanceMeters * clampedProgress;
-
-    var cumulative = 0.0;
-    for (var i = 1; i < points.length; i++) {
-      final start = points[i - 1];
-      final end = points[i];
-      final segmentMeters = _distanceMeters(start, end);
-      if (segmentMeters <= 0) {
-        continue;
-      }
-      if (cumulative + segmentMeters >= targetMeters) {
-        final remaining = targetMeters - cumulative;
-        final t = remaining / segmentMeters;
-        final lat = start.latitude + (end.latitude - start.latitude) * t;
-        final lng = start.longitude + (end.longitude - start.longitude) * t;
-        return LatLng(lat, lng);
-      }
-      cumulative += segmentMeters;
-    }
-    return points.last;
-  }
-
-  double _distanceMeters(LatLng a, LatLng b) {
-    const earthRadius = 6371000.0;
-    final dLat = _degToRad(b.latitude - a.latitude);
-    final dLng = _degToRad(b.longitude - a.longitude);
-    final lat1 = _degToRad(a.latitude);
-    final lat2 = _degToRad(b.latitude);
-
-    final sinDLat = math.sin(dLat / 2);
-    final sinDLng = math.sin(dLng / 2);
-    final aa = sinDLat * sinDLat + math.cos(lat1) * math.cos(lat2) * sinDLng * sinDLng;
-    final c = 2 * math.atan2(math.sqrt(aa), math.sqrt(1 - aa));
-    return earthRadius * c;
-  }
-
-  double _degToRad(double degrees) => degrees * (math.pi / 180.0);
 
   void _setManualLocation(LatLng position, {bool force = false, double? zoom}) {
     final routeState = context.read<SpooferRouteBloc>().state;

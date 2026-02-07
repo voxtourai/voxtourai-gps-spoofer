@@ -15,7 +15,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../controllers/mock_location_controller.dart';
 import '../../controllers/preferences_controller.dart';
-import '../../controllers/theme_controller.dart';
 import '../../spoofer/bloc/map/spoofer_map_bloc.dart';
 import '../../spoofer/bloc/map/spoofer_map_event.dart';
 import '../../spoofer/bloc/map/spoofer_map_state.dart';
@@ -1045,18 +1044,6 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _applyDarkModeSetting(DarkModeSetting setting) {
     _settingsCubit.setDarkModeSetting(setting);
-    switch (setting) {
-      case DarkModeSetting.on:
-        themeController.mode.value = ThemeMode.system;
-        break;
-      case DarkModeSetting.uiOnly:
-        themeController.mode.value = ThemeMode.dark;
-        break;
-      case DarkModeSetting.mapOnly:
-      case DarkModeSetting.off:
-        themeController.mode.value = ThemeMode.light;
-        break;
-    }
     unawaited(_applyMapStyle());
   }
 

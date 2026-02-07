@@ -71,6 +71,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
+  static const int _initialMapStyleRetryCount = 3;
+  static const Duration _initialMapStyleRetryDelay = Duration(milliseconds: 250);
   bool _tosAccepted = false;
   PackageInfo? _packageInfo;
   bool _packageInfoLoading = false;
@@ -121,6 +123,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     } else {
       playbackBloc.add(const SpooferPlaybackAppPaused());
     }
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    if (!mounted || _settings.darkModeSetting != DarkModeSetting.on) {
+      return;
+    }
+    unawaited(_applyMapStyle(force: true));
   }
 
   Future<void> _initNotifications() async {
@@ -946,22 +956,39 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _mapState.setLastMapStyleDark(null);
-    unawaited(_applyMapStyle());
+    unawaited(_applyMapStyle(force: true));
+    unawaited(_retryInitialMapStyleApply());
     if (_mapState.pendingFitRoute) {
       _fitRouteToMap();
     }
   }
 
-  Future<void> _applyMapStyle() async {
+  Future<void> _retryInitialMapStyleApply() async {
+    for (var attempt = 0; attempt < _initialMapStyleRetryCount; attempt += 1) {
+      await Future<void>.delayed(_initialMapStyleRetryDelay);
+      final applied = await _applyMapStyle(force: true);
+      if (applied) {
+        return;
+      }
+    }
+  }
+
+  Future<bool> _applyMapStyle({bool force = false}) async {
     if (_mapController == null) {
-      return;
+      return false;
     }
     final useDarkStyle = _shouldUseDarkMapStyle();
-    if (_mapState.lastMapStyleDark == useDarkStyle) {
-      return;
+    if (!force && _mapState.lastMapStyleDark == useDarkStyle) {
+      return true;
     }
-    _mapState.setLastMapStyleDark(useDarkStyle);
-    await _mapController!.setMapStyle(useDarkStyle ? darkMapStyle : null);
+    try {
+      await _mapController!.setMapStyle(useDarkStyle ? darkMapStyle : null);
+      _mapState.setLastMapStyleDark(useDarkStyle);
+      return true;
+    } catch (_) {
+      _mapState.setLastMapStyleDark(null);
+      return false;
+    }
   }
 
   bool _shouldUseDarkMapStyle() {

@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../controllers/preferences_controller.dart';
-import '../../../controllers/route_controller.dart';
 import '../../../controllers/waypoint_controller.dart';
 
 import 'spoofer_route_event.dart';
@@ -32,8 +33,11 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
   }
 
   final PreferencesController _preferencesController;
-  final RouteController _route = RouteController();
   final WaypointController _waypoints = WaypointController();
+  List<LatLng> _routePoints = <LatLng>[];
+  List<double> _routeCumulativeMeters = <double>[];
+  double _routeTotalDistanceMeters = 0;
+  double _routeProgress = 0;
   List<Map<String, Object?>> _savedRoutes = const <Map<String, Object?>>[];
   bool _savedRoutesLoaded = false;
   int _messageId = 0;
@@ -41,7 +45,6 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
 
   @override
   Future<void> close() {
-    _route.dispose();
     _waypoints.dispose();
     return super.close();
   }
@@ -59,7 +62,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteClearRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    _route.clear();
+    _clearRoute();
     _waypoints.clear();
     emit(_buildState());
   }
@@ -68,10 +71,10 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteProgressSetRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    if (!_route.hasPoints) {
+    if (_routePoints.isEmpty) {
       return;
     }
-    _route.setProgress(_clamp01(event.progress));
+    _setProgress(_clamp01(event.progress));
     emit(_buildState());
   }
 
@@ -79,7 +82,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     SpooferRouteWaypointAddedRequested event,
     Emitter<SpooferRouteState> emit,
   ) {
-    if (_route.hasPoints && !_waypoints.usingCustomRoute) {
+    if (_routePoints.isNotEmpty && !_waypoints.usingCustomRoute) {
       emit(_buildState(message: 'Clear the loaded route to edit a custom route.'));
       return;
     }
@@ -217,13 +220,13 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
 
   void _rebuildRouteFromWaypoints({bool resetProgress = true}) {
     if (_waypoints.points.isEmpty) {
-      _route.clear();
+      _clearRoute();
       return;
     }
-    final previousProgress = _route.progress;
-    _route.setRoute(List<LatLng>.from(_waypoints.points));
-    if (!resetProgress && _route.totalDistanceMeters > 0) {
-      _route.setProgress(previousProgress);
+    final previousProgress = _routeProgress;
+    _setRoute(List<LatLng>.from(_waypoints.points));
+    if (!resetProgress && _routeTotalDistanceMeters > 0) {
+      _setProgress(previousProgress);
     }
   }
 
@@ -244,14 +247,14 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     }
 
     try {
-      final points = _route.decodePolyline(polyline);
+      final points = _decodePolyline(polyline);
       if (points.length < 2) {
         emit(_buildState(message: 'Failed to decode polyline.'));
         return;
       }
       _waypoints.clear();
-      _route.setRoute(points);
-      _route.setProgress(0);
+      _setRoute(points);
+      _setProgress(0);
       emit(_buildState());
     } on RangeError {
       emit(_buildState(message: 'Invalid polyline: input is incomplete or malformed.'));
@@ -345,10 +348,10 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     return SpooferRouteState(
       initialized: initialized ?? state.initialized,
       revision: ++_revision,
-      routePoints: List<LatLng>.unmodifiable(_route.points),
-      progress: _route.progress,
-      totalDistanceMeters: _route.totalDistanceMeters,
-      currentRoutePosition: _route.positionForCurrentProgress(),
+      routePoints: List<LatLng>.unmodifiable(_routePoints),
+      progress: _routeProgress,
+      totalDistanceMeters: _routeTotalDistanceMeters,
+      currentRoutePosition: _positionForCurrentProgress(),
       waypointPoints: List<LatLng>.unmodifiable(_waypoints.points),
       waypointNames: List<String>.unmodifiable(_waypoints.names),
       selectedWaypointIndex: _waypoints.selectedIndex,
@@ -357,6 +360,114 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
       savedRoutesLoaded: _savedRoutesLoaded,
       message: messageModel,
     );
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    final points = PolylinePoints().decodePolyline(encoded);
+    return points.map((point) => LatLng(point.latitude, point.longitude)).toList();
+  }
+
+  void _clearRoute() {
+    _routePoints = <LatLng>[];
+    _routeCumulativeMeters = <double>[];
+    _routeTotalDistanceMeters = 0;
+    _routeProgress = 0;
+  }
+
+  void _setRoute(List<LatLng> points) {
+    _routePoints = points;
+    _routeCumulativeMeters = _buildCumulativeMeters(points);
+    _routeTotalDistanceMeters = _routeCumulativeMeters.isEmpty ? 0 : _routeCumulativeMeters.last;
+    _routeProgress = 0;
+  }
+
+  void _setProgress(double value) {
+    _routeProgress = _clamp01(value);
+  }
+
+  LatLng? _positionForCurrentProgress() => _positionForProgress(_routeProgress);
+
+  LatLng? _positionForProgress(double progress) {
+    if (_routePoints.isEmpty) {
+      return null;
+    }
+    if (_routeTotalDistanceMeters == 0) {
+      return _routePoints.first;
+    }
+    return _positionAtDistance(_routeTotalDistanceMeters * _clamp01(progress));
+  }
+
+  LatLng _positionAtDistance(double meters) {
+    if (meters <= 0) {
+      return _routePoints.first;
+    }
+    if (meters >= _routeTotalDistanceMeters) {
+      return _routePoints.last;
+    }
+
+    final index = _upperBound(_routeCumulativeMeters, meters);
+    final startIndex = math.max(0, index - 1);
+    final endIndex = math.min(_routePoints.length - 1, index);
+
+    final startDistance = _routeCumulativeMeters[startIndex];
+    final endDistance = _routeCumulativeMeters[endIndex];
+    final segmentLength = endDistance - startDistance;
+
+    if (segmentLength <= 0) {
+      return _routePoints[startIndex];
+    }
+
+    final t = (meters - startDistance) / segmentLength;
+    final start = _routePoints[startIndex];
+    final end = _routePoints[endIndex];
+    return _interpolate(start, end, t);
+  }
+
+  List<double> _buildCumulativeMeters(List<LatLng> points) {
+    if (points.isEmpty) {
+      return <double>[];
+    }
+    final cumulative = List<double>.filled(points.length, 0);
+    for (var i = 1; i < points.length; i++) {
+      cumulative[i] = cumulative[i - 1] + _distanceMeters(points[i - 1], points[i]);
+    }
+    return cumulative;
+  }
+
+  int _upperBound(List<double> values, double target) {
+    var low = 0;
+    var high = values.length;
+    while (low < high) {
+      final mid = low + ((high - low) >> 1);
+      if (values[mid] <= target) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
+
+  double _distanceMeters(LatLng a, LatLng b) {
+    const earthRadius = 6371000.0;
+    final dLat = _degToRad(b.latitude - a.latitude);
+    final dLng = _degToRad(b.longitude - a.longitude);
+    final lat1 = _degToRad(a.latitude);
+    final lat2 = _degToRad(b.latitude);
+
+    final sinDLat = math.sin(dLat / 2);
+    final sinDLng = math.sin(dLng / 2);
+    final aa = sinDLat * sinDLat + math.cos(lat1) * math.cos(lat2) * sinDLng * sinDLng;
+    final c = 2 * math.atan2(math.sqrt(aa), math.sqrt(1 - aa));
+    return earthRadius * c;
+  }
+
+  double _degToRad(double degrees) => degrees * (math.pi / 180.0);
+
+  LatLng _interpolate(LatLng start, LatLng end, double t) {
+    final lat = start.latitude + (end.latitude - start.latitude) * t;
+    final lng = start.longitude + (end.longitude - start.longitude) * t;
+    return LatLng(lat, lng);
   }
 
   double _clamp01(double value) {

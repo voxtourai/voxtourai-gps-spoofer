@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Route Bloc Tests" type="FlutterTestRunConfigurationType" factoryName="Flutter Test">
+    <option name="filePath" value="$PROJECT_DIR$/test/spoofer_route_bloc_test.dart" />
+    <method v="2" />
+  </configuration>
+</component>

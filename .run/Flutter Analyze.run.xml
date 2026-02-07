@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Flutter Analyze" type="FlutterCommandRunConfigurationType" factoryName="Flutter Command">
+    <option name="filePath" value="$PROJECT_DIR$" />
+    <option name="additionalArgs" value="analyze" />
+    <method v="2" />
+  </configuration>
+</component>

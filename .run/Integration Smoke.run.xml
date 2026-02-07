@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Integration Smoke" type="FlutterTestRunConfigurationType" factoryName="Flutter Test">
+    <option name="filePath" value="$PROJECT_DIR$/integration_test/app_smoke_test.dart" />
+    <method v="2" />
+  </configuration>
+</component>

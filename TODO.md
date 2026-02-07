@@ -3,11 +3,6 @@
 This file tracks the BLoC migration plan for the GPS spoofer app.
 As each chunk is implemented, remove that chunk from this file.
 
-## Chunk 2: Route + waypoint migration
-- Move route parsing/progress/waypoint CRUD/saved routes into `SpooferRouteBloc`.
-- Replace route/waypoint controller reads in UI with `BlocBuilder`.
-- Goal: Route load/clear/demo/manual waypoints/save-load routes keep current behavior.
-
 ## Chunk 3: Playback migration
 - Move play/pause/speed/tick logic into `SpooferPlaybackBloc`.
 - Dispatch tick events from bloc-managed timer.

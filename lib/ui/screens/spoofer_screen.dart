@@ -101,7 +101,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.removeObserver(this);
     _overlayMessage?.remove();
     _overlayMessage = null;
-    unawaited(_cancelBackgroundNotification());
+    unawaited(_notifications.cancel(_backgroundNotificationId));
     _routeController.dispose();
     super.dispose();
   }

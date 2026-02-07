@@ -4,14 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'controllers/mock_location_controller.dart';
 import 'spoofer/bloc/map/spoofer_map_bloc.dart';
 import 'spoofer/bloc/map/spoofer_map_event.dart';
-import 'spoofer/bloc/message/spoofer_message_cubit.dart';
+import 'spoofer/bloc/message/spoofer_message_bloc.dart';
 import 'spoofer/bloc/mock/spoofer_mock_bloc.dart';
 import 'spoofer/bloc/mock/spoofer_mock_event.dart';
 import 'spoofer/bloc/playback/spoofer_playback_bloc.dart';
 import 'spoofer/bloc/playback/spoofer_playback_event.dart';
 import 'spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'spoofer/bloc/route/spoofer_route_event.dart';
-import 'spoofer/bloc/settings/spoofer_settings_cubit.dart';
+import 'spoofer/bloc/settings/spoofer_settings_bloc.dart';
 import 'spoofer/bloc/settings/spoofer_settings_state.dart';
 import 'ui/screens/spoofer_screen.dart';
 
@@ -36,14 +36,14 @@ class GpsSpooferApp extends StatelessWidget {
         BlocProvider<SpooferMapBloc>(
           create: (_) => SpooferMapBloc()..add(const SpooferMapInitialized()),
         ),
-        BlocProvider<SpooferMessageCubit>(
-          create: (_) => SpooferMessageCubit(),
+        BlocProvider<SpooferMessageBloc>(
+          create: (_) => SpooferMessageBloc(),
         ),
-        BlocProvider<SpooferSettingsCubit>(
-          create: (_) => SpooferSettingsCubit(),
+        BlocProvider<SpooferSettingsBloc>(
+          create: (_) => SpooferSettingsBloc(),
         ),
       ],
-      child: BlocBuilder<SpooferSettingsCubit, SpooferSettingsState>(
+      child: BlocBuilder<SpooferSettingsBloc, SpooferSettingsState>(
         buildWhen: (previous, current) => previous.darkModeSetting != current.darkModeSetting,
         builder: (context, settingsState) {
           final themeMode = switch (settingsState.darkModeSetting) {

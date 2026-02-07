@@ -18,7 +18,8 @@ import '../../controllers/preferences_controller.dart';
 import '../../spoofer/bloc/map/spoofer_map_bloc.dart';
 import '../../spoofer/bloc/map/spoofer_map_event.dart';
 import '../../spoofer/bloc/map/spoofer_map_state.dart';
-import '../../spoofer/bloc/message/spoofer_message_cubit.dart';
+import '../../spoofer/bloc/message/spoofer_message_bloc.dart';
+import '../../spoofer/bloc/message/spoofer_message_event.dart';
 import '../../spoofer/bloc/message/spoofer_message_state.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_bloc.dart';
 import '../../spoofer/bloc/mock/spoofer_mock_event.dart';
@@ -29,7 +30,8 @@ import '../../spoofer/bloc/playback/spoofer_playback_state.dart';
 import '../../spoofer/bloc/route/spoofer_route_bloc.dart';
 import '../../spoofer/bloc/route/spoofer_route_event.dart';
 import '../../spoofer/bloc/route/spoofer_route_state.dart';
-import '../../spoofer/bloc/settings/spoofer_settings_cubit.dart';
+import '../../spoofer/bloc/settings/spoofer_settings_bloc.dart';
+import '../../spoofer/bloc/settings/spoofer_settings_event.dart';
 import '../../spoofer/bloc/settings/spoofer_settings_state.dart';
 import '../../spoofer/coordinator/spoofer_runtime_coordinator.dart';
 import '../map/map_style.dart';
@@ -77,9 +79,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   int _titleTapCount = 0;
   DateTime? _lastTitleTapAt;
 
-  SpooferSettingsCubit get _settingsCubit => context.read<SpooferSettingsCubit>();
-  SpooferSettingsState get _settingsState => _settingsCubit.state;
-  SpooferMessageCubit get _messages => context.read<SpooferMessageCubit>();
+  SpooferSettingsBloc get _settingsBloc => context.read<SpooferSettingsBloc>();
+  SpooferSettingsState get _settingsState => _settingsBloc.state;
+  SpooferMessageBloc get _messagesBloc => context.read<SpooferMessageBloc>();
   SpooferMapBloc get _mapBloc => context.read<SpooferMapBloc>();
   SpooferMapState get _mapState => _mapBloc.state;
 
@@ -159,7 +161,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       'Mock GPS can keep running in the background.',
       details,
     );
-    _settingsCubit.setBackgroundNotificationShown(true);
+    _settingsBloc.add(
+      const SpooferSettingsBackgroundNotificationShownSetRequested(value: true),
+    );
   }
 
   Future<void> _cancelBackgroundNotification() async {
@@ -167,7 +171,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     await _notifications.cancel(_backgroundNotificationId);
-    _settingsCubit.setBackgroundNotificationShown(false);
+    _settingsBloc.add(
+      const SpooferSettingsBackgroundNotificationShownSetRequested(value: false),
+    );
   }
 
   void _setMapCurrentPosition(LatLng? position, {bool updateLastInjected = false}) {
@@ -207,6 +213,24 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _mapBloc.add(SpooferMapLastMapStyleDarkSetRequested(value: value));
   }
 
+  void _showUiSnack(String message) {
+    _messagesBloc.add(
+      SpooferMessageShownRequested(
+        type: SpooferMessageType.snack,
+        message: message,
+      ),
+    );
+  }
+
+  void _showUiOverlay(String message) {
+    _messagesBloc.add(
+      SpooferMessageShownRequested(
+        type: SpooferMessageType.overlay,
+        message: message,
+      ),
+    );
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -227,7 +251,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         BlocListener<SpooferMockBloc, SpooferMockState>(
           listener: (context, mockState) => _handleMockBlocState(mockState),
         ),
-        BlocListener<SpooferMessageCubit, SpooferMessageState>(
+        BlocListener<SpooferMessageBloc, SpooferMessageState>(
           listener: (context, messageState) => _handleUiMessageState(messageState),
         ),
       ],
@@ -237,7 +261,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             builder: (context, playbackState) {
               return BlocBuilder<SpooferMockBloc, SpooferMockState>(
                 builder: (context, mockState) {
-                  return BlocBuilder<SpooferSettingsCubit, SpooferSettingsState>(
+                  return BlocBuilder<SpooferSettingsBloc, SpooferSettingsState>(
                     builder: (context, settingsState) {
                   return Scaffold(
                     appBar: AppBar(
@@ -335,7 +359,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                       },
                                       onLongPress: (position) {
                                         if (routeState.hasPoints && !routeState.usingCustomRoute) {
-                                          _messages.showSnack('Clear the loaded route to add points.');
+                                          _showUiSnack('Clear the loaded route to add points.');
                                           return;
                                         }
                                         _addCustomPoint(position);
@@ -384,7 +408,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                                 heroTag: 'fitRoute',
                                                 onPressed: () {
                                                   _fitRouteToMap();
-                                                  _messages.showOverlay('Map fit to route');
+                                                  _showUiOverlay('Map fit to route');
                                                 },
                                                 tooltip: 'Fit route',
                                                 child: const Icon(Icons.fit_screen),
@@ -400,7 +424,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                                       _setMapAutoFollow(true);
                                                       _followCamera(mapState.currentPosition!);
                                                       if (!wasAutoFollow) {
-                                                        _messages.showOverlay('Auto-follow enabled');
+                                                        _showUiOverlay('Auto-follow enabled');
                                                       }
                                                     },
                                               tooltip: 'Recenter',
@@ -595,7 +619,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     controller.selection = TextSelection.collapsed(
                       offset: controller.text.length,
                     );
-                    _messages.showOverlay('Filled demo route.');
+                    _showUiOverlay('Filled demo route.');
                   },
                   child: const Text('Demo'),
                 ),
@@ -657,7 +681,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final message = routeState.message;
     if (message != null && message.id != _lastRouteMessageId) {
       _lastRouteMessageId = message.id;
-      _messages.showSnack(message.text);
+      _showUiSnack(message.text);
     }
     if (!routeState.hasRoute && context.read<SpooferPlaybackBloc>().state.isPlaying) {
       _stopPlayback();
@@ -670,7 +694,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final message = mockState.message;
     if (message != null && message.id != _lastMockMessageId) {
       _lastMockMessageId = message.id;
-      _messages.showSnack(message.text);
+      _showUiSnack(message.text);
     }
     final prompt = mockState.prompt;
     if (prompt != null && prompt.id != _lastMockPromptId) {
@@ -943,51 +967,51 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<bool> _setBackgroundMode(bool enabled) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
-      _messages.showSnack('Background mode is only supported on Android.');
+      _showUiSnack('Background mode is only supported on Android.');
       return false;
     }
 
-    _settingsCubit.setBackgroundBusy(true);
+    _settingsBloc.add(const SpooferSettingsBackgroundBusySetRequested(value: true));
 
     try {
       if (enabled) {
         final notificationStatus = await Permission.notification.request();
         if (!notificationStatus.isGranted) {
-          _messages.showSnack('Notification permission is required for background mode.');
+          _showUiSnack('Notification permission is required for background mode.');
           return false;
         }
 
         final initialized = await FlutterBackground.initialize(androidConfig: _backgroundConfig);
         if (!initialized) {
-          _messages.showSnack('Please disable battery optimizations to enable background mode.');
+          _showUiSnack('Please disable battery optimizations to enable background mode.');
           return false;
         }
         final hasPermissions = await FlutterBackground.hasPermissions;
         if (!hasPermissions) {
-          _messages.showSnack(
+          _showUiSnack(
             'Background permissions not granted. Disable battery optimizations and retry.',
           );
           return false;
         }
         final success = await FlutterBackground.enableBackgroundExecution();
         if (!success) {
-          _messages.showSnack('Failed to enable background mode.');
+          _showUiSnack('Failed to enable background mode.');
           return false;
         }
-        _settingsCubit.setBackgroundEnabled(true);
-        _messages.showSnack('Background mode enabled. Keep playback running to spoof.');
+        _settingsBloc.add(const SpooferSettingsBackgroundEnabledSetRequested(value: true));
+        _showUiSnack('Background mode enabled. Keep playback running to spoof.');
         return true;
       } else {
         await FlutterBackground.disableBackgroundExecution();
-        _settingsCubit.setBackgroundEnabled(false);
+        _settingsBloc.add(const SpooferSettingsBackgroundEnabledSetRequested(value: false));
         unawaited(_cancelBackgroundNotification());
         return true;
       }
     } catch (error) {
-      _messages.showSnack('Background mode error: $error');
+      _showUiSnack('Background mode error: $error');
       return false;
     } finally {
-      _settingsCubit.setBackgroundBusy(false);
+      _settingsBloc.add(const SpooferSettingsBackgroundBusySetRequested(value: false));
     }
   }
 
@@ -1043,14 +1067,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _applyDarkModeSetting(DarkModeSetting setting) {
-    _settingsCubit.setDarkModeSetting(setting);
+    _settingsBloc.add(SpooferSettingsDarkModeSetRequested(value: setting));
     unawaited(_applyMapStyle());
   }
 
   Future<void> _loadRouteFromInput() async {
     final input = _routeController.text.trim();
     if (input.isEmpty) {
-      _messages.showSnack('Paste an encoded polyline or Routes API JSON.');
+      _showUiSnack('Paste an encoded polyline or Routes API JSON.');
       return;
     }
 
@@ -1262,7 +1286,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   void _addCustomPoint(LatLng position) {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (routeState.hasPoints && !routeState.usingCustomRoute) {
-      _messages.showSnack('Clear the loaded route to edit a custom route.');
+      _showUiSnack('Clear the loaded route to edit a custom route.');
       return;
     }
     context.read<SpooferRouteBloc>().add(SpooferRouteWaypointAddedRequested(position: position));
@@ -1286,7 +1310,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<void> _saveCustomRoute() async {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (routeState.waypointPoints.isEmpty) {
-      _messages.showSnack('No custom route to save.');
+      _showUiSnack('No custom route to save.');
       return;
     }
     final suggested = 'Custom route ${DateTime.now().toLocal().toString().substring(0, 16)}';
@@ -1329,7 +1353,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final routes = List<Map<String, Object?>>.from(loadedState.savedRoutes);
 
     if (routes.isEmpty) {
-      _messages.showSnack('No saved routes yet.');
+      _showUiSnack('No saved routes yet.');
       return false;
     }
     var loaded = false;
@@ -1887,7 +1911,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showSetupBar = value;
                             });
-                            _settingsCubit.setShowSetupBar(value);
+                            _settingsBloc.add(
+                              SpooferSettingsShowSetupBarSetRequested(value: value),
+                            );
                           },
                         ),
                         buildToggle(
@@ -1897,7 +1923,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showDebugPanel = value;
                             });
-                            _settingsCubit.setShowDebugPanel(value);
+                            _settingsBloc.add(
+                              SpooferSettingsShowDebugPanelSetRequested(value: value),
+                            );
                           },
                         ),
                         buildToggle(
@@ -1907,7 +1935,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             setModalState(() {
                               showMockMarker = value;
                             });
-                            _settingsCubit.setShowMockMarker(value);
+                            _settingsBloc.add(
+                              SpooferSettingsShowMockMarkerSetRequested(value: value),
+                            );
                             _refreshMarkers();
                           },
                         ),
@@ -1927,13 +1957,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                   backgroundEnabled = value;
                                   backgroundBusy = true;
                                 });
-                                _settingsCubit.setBackgroundBusy(true);
+                                _settingsBloc.add(
+                                  const SpooferSettingsBackgroundBusySetRequested(value: true),
+                                );
                                 final ok = await _setBackgroundMode(value);
                                 setModalState(() {
                                   backgroundBusy = false;
                                   backgroundEnabled = _settingsState.backgroundEnabled;
                                 });
-                                _settingsCubit.setBackgroundBusy(false);
+                                _settingsBloc.add(
+                                  const SpooferSettingsBackgroundBusySetRequested(value: false),
+                                );
                                 if (!ok) {
                                   // snack handled in _setBackgroundMode
                                 }
@@ -1949,13 +1983,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               backgroundEnabled = next;
                               backgroundBusy = true;
                             });
-                            _settingsCubit.setBackgroundBusy(true);
+                            _settingsBloc.add(
+                              const SpooferSettingsBackgroundBusySetRequested(value: true),
+                            );
                             final ok = await _setBackgroundMode(next);
                             setModalState(() {
                               backgroundBusy = false;
                               backgroundEnabled = _settingsState.backgroundEnabled;
                             });
-                            _settingsCubit.setBackgroundBusy(false);
+                            _settingsBloc.add(
+                              const SpooferSettingsBackgroundBusySetRequested(value: false),
+                            );
                             if (!ok) {
                               // snack handled in _setBackgroundMode
                             }
@@ -2006,7 +2044,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                               location = await _getRealLocation();
                             }
                             if (location == null) {
-                              _messages.showSnack('Real location not available yet.');
+                              _showUiSnack('Real location not available yet.');
                               return;
                             }
                             _setMapCurrentPosition(location);

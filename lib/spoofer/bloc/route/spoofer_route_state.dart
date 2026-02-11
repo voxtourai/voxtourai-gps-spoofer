@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+
+part 'spoofer_route_state.g.dart';
 
 @immutable
 class SpooferRouteStateMessage {
@@ -13,6 +16,7 @@ class SpooferRouteStateMessage {
 }
 
 @immutable
+@CopyWith()
 class SpooferRouteState {
   const SpooferRouteState({
     this.initialized = false,
@@ -48,43 +52,4 @@ class SpooferRouteState {
   bool get hasPoints => routePoints.isNotEmpty;
   bool get hasWaypointPoints => waypointPoints.isNotEmpty;
   double get progressDistance => totalDistanceMeters * progress;
-
-  SpooferRouteState copyWith({
-    bool? initialized,
-    int? revision,
-    List<LatLng>? routePoints,
-    double? progress,
-    double? totalDistanceMeters,
-    LatLng? currentRoutePosition,
-    bool clearCurrentRoutePosition = false,
-    List<LatLng>? waypointPoints,
-    List<String>? waypointNames,
-    int? selectedWaypointIndex,
-    bool clearSelectedWaypointIndex = false,
-    bool? usingCustomRoute,
-    List<Map<String, Object?>>? savedRoutes,
-    bool? savedRoutesLoaded,
-    SpooferRouteStateMessage? message,
-    bool clearMessage = false,
-  }) {
-    return SpooferRouteState(
-      initialized: initialized ?? this.initialized,
-      revision: revision ?? this.revision,
-      routePoints: routePoints ?? this.routePoints,
-      progress: progress ?? this.progress,
-      totalDistanceMeters: totalDistanceMeters ?? this.totalDistanceMeters,
-      currentRoutePosition: clearCurrentRoutePosition
-          ? null
-          : (currentRoutePosition ?? this.currentRoutePosition),
-      waypointPoints: waypointPoints ?? this.waypointPoints,
-      waypointNames: waypointNames ?? this.waypointNames,
-      selectedWaypointIndex: clearSelectedWaypointIndex
-          ? null
-          : (selectedWaypointIndex ?? this.selectedWaypointIndex),
-      usingCustomRoute: usingCustomRoute ?? this.usingCustomRoute,
-      savedRoutes: savedRoutes ?? this.savedRoutes,
-      savedRoutesLoaded: savedRoutesLoaded ?? this.savedRoutesLoaded,
-      message: clearMessage ? null : (message ?? this.message),
-    );
-  }
 }

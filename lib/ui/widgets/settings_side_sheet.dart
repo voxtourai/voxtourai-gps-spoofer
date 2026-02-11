@@ -103,18 +103,25 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
   }
 
   Future<void> _toggleBackground(bool value) async {
+    if (_backgroundBusy) {
+      return;
+    }
     setState(() {
       _backgroundEnabled = value;
       _backgroundBusy = true;
     });
-    await widget.onBackgroundModeChanged(value);
+    try {
+      await widget.onBackgroundModeChanged(value);
+    } catch (_) {
+      // parent handles user-facing errors/snackbars
+    }
     if (!mounted) {
       return;
     }
     final refreshed = widget.readSettings();
     setState(() {
       _backgroundEnabled = refreshed.backgroundEnabled;
-      _backgroundBusy = refreshed.backgroundBusy;
+      _backgroundBusy = false;
     });
   }
 

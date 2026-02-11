@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class PreferencesController {
   static const String _tosAcceptedKey = 'tos_accepted_v1';
   static const String _savedRoutesKey = 'saved_custom_routes_v1';
+  static const String _startupPromptsShownKey = 'startup_prompts_shown_v1';
 
   Future<bool> isTosAccepted() async {
     final prefs = await SharedPreferences.getInstance();
@@ -15,6 +16,16 @@ class PreferencesController {
   Future<void> setTosAccepted(bool accepted) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_tosAcceptedKey, accepted);
+  }
+
+  Future<bool> isStartupPromptsShown() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_startupPromptsShownKey) ?? false;
+  }
+
+  Future<void> setStartupPromptsShown(bool shown) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_startupPromptsShownKey, shown);
   }
 
   Future<List<Map<String, Object?>>> loadSavedRoutes() async {
@@ -29,7 +40,9 @@ class PreferencesController {
     }
     return decoded
         .whereType<Map>()
-        .map((entry) => entry.map((key, value) => MapEntry(key.toString(), value)))
+        .map(
+          (entry) => entry.map((key, value) => MapEntry(key.toString(), value)),
+        )
         .toList();
   }
 
@@ -47,11 +60,7 @@ class PreferencesController {
     final entry = {
       'name': name,
       'points': [
-        for (final p in points)
-          {
-            'lat': p.latitude,
-            'lng': p.longitude,
-          }
+        for (final p in points) {'lat': p.latitude, 'lng': p.longitude},
       ],
       'names': List<String>.from(names),
     };

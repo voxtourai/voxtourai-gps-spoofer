@@ -104,6 +104,10 @@ class _SpooferScreenState extends State<SpooferScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final accepted = await _ensureTosAccepted();
       if (accepted) {
+        await _runFirstLaunchPrompts();
+        if (!mounted) {
+          return;
+        }
         _requestStartupChecks(showDialogs: true);
       }
     });
@@ -155,6 +159,28 @@ class _SpooferScreenState extends State<SpooferScreen>
       android: androidSettings,
     );
     await _notifications.initialize(settings);
+  }
+
+  Future<void> _runFirstLaunchPrompts() async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+    final promptsShown = await _prefs.isStartupPromptsShown();
+    if (promptsShown) {
+      return;
+    }
+
+    try {
+      var notificationStatus = await Permission.notification.status;
+      if (!notificationStatus.isGranted) {
+        notificationStatus = await Permission.notification.request();
+      }
+      await FlutterBackground.initialize(androidConfig: _backgroundConfig);
+    } catch (_) {
+      // First-launch prompt flow is best effort only.
+    } finally {
+      await _prefs.setStartupPromptsShown(true);
+    }
   }
 
   Future<void> _showBackgroundNotification() async {
@@ -812,8 +838,14 @@ class _SpooferScreenState extends State<SpooferScreen>
 
     try {
       if (enabled) {
-        final notificationStatus = await Permission.notification.request();
+        var notificationStatus = await Permission.notification.status;
         if (!notificationStatus.isGranted) {
+          notificationStatus = await Permission.notification.request();
+        }
+        if (!notificationStatus.isGranted) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           _showUiSnack(
             'Notification permission is required for background mode.',
           );

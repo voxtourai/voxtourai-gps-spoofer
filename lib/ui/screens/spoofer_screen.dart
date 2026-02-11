@@ -39,6 +39,7 @@ import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
 import '../widgets/map_action_buttons.dart';
 import '../widgets/route_input_dialog.dart';
+import '../widgets/saved_routes_sheet.dart';
 import '../widgets/settings_side_sheet.dart';
 import '../widgets/spoofer_app_bar.dart';
 import '../widgets/spoofer_debug_panel.dart';
@@ -1305,48 +1306,22 @@ class _SpooferScreenState extends State<SpooferScreen>
       _showUiSnack('No saved routes yet.');
       return false;
     }
-    var loaded = false;
-    await showModalBottomSheet<void>(
+    return showSavedRoutesSheet(
       context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return ListView.separated(
-              itemCount: routes.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final item = routes[index];
-                final name = item['name']?.toString() ?? 'Route';
-                final points = (item['points'] as List?) ?? [];
-                return ListTile(
-                  title: Text(name),
-                  subtitle: Text('${points.length} points'),
-                  onTap: () {
-                    context.read<SpooferRouteBloc>().add(
-                      SpooferRouteSavedRouteApplyRequested(index: index),
-                    );
-                    loaded = true;
-                    Navigator.of(context).pop();
-                  },
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () async {
-                      context.read<SpooferRouteBloc>().add(
-                        SpooferRouteSavedRouteDeleteRequested(index: index),
-                      );
-                      routes.removeAt(index);
-                      setSheetState(() {});
-                    },
-                  ),
-                );
-              },
-            );
-          },
+      routes: routes,
+      onApply: (index) {
+        context.read<SpooferRouteBloc>().add(
+          SpooferRouteSavedRouteApplyRequested(index: index),
         );
       },
+      onDelete: (index) async {
+        context.read<SpooferRouteBloc>().add(
+          SpooferRouteSavedRouteDeleteRequested(index: index),
+        );
+        routes.removeAt(index);
+        return routes;
+      },
     );
-    return loaded;
   }
 
   void _reorderCustomPoints(int oldIndex, int newIndex) {

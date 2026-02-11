@@ -6,6 +6,7 @@ class SpooferGoogleMapView extends StatelessWidget {
     super.key,
     required this.hasLocationPermission,
     required this.currentPosition,
+    required this.mapStyle,
     required this.markers,
     required this.polylines,
     required this.padding,
@@ -22,6 +23,7 @@ class SpooferGoogleMapView extends StatelessWidget {
 
   final bool hasLocationPermission;
   final LatLng? currentPosition;
+  final String? mapStyle;
   final Set<Marker> markers;
   final Set<Polyline> polylines;
   final EdgeInsets padding;
@@ -53,6 +55,7 @@ class SpooferGoogleMapView extends StatelessWidget {
         onCameraIdle: onCameraIdle,
         onTap: onTap,
         onLongPress: onLongPress,
+        style: mapStyle,
         markers: markers,
         polylines: polylines,
         mapToolbarEnabled: false,

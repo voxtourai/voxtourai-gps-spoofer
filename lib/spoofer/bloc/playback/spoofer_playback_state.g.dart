@@ -90,5 +90,6 @@ class _$SpooferPlaybackStateCWProxyImpl implements _$SpooferPlaybackStateCWProxy
 
 extension $SpooferPlaybackStateCopyWith on SpooferPlaybackState {
   /// Returns a callable class used to build a new instance with modified fields.
+  // ignore: library_private_types_in_public_api
   _$SpooferPlaybackStateCWProxy get copyWith => _$SpooferPlaybackStateCWProxyImpl(this);
 }

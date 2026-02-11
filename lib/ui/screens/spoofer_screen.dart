@@ -82,10 +82,6 @@ class _SpooferScreenState extends State<SpooferScreen>
   static const int _backgroundNotificationId = 1001;
   static const String _backgroundNotificationActionReset =
       'reset_mock_location';
-  static const int _initialMapStyleRetryCount = 3;
-  static const Duration _initialMapStyleRetryDelay = Duration(
-    milliseconds: 250,
-  );
   bool _tosAccepted = false;
   PackageInfo? _packageInfo;
   bool _packageInfoLoading = false;
@@ -142,7 +138,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     if (!mounted || _settingsState.darkModeSetting != DarkModeSetting.on) {
       return;
     }
-    unawaited(_applyMapStyle(force: true));
+    setState(() {});
   }
 
   Future<void> _initNotifications() async {
@@ -323,10 +319,6 @@ class _SpooferScreenState extends State<SpooferScreen>
     _mapBloc.add(SpooferMapProgrammaticMoveSetRequested(value: value));
   }
 
-  void _setMapLastMapStyleDark(bool? value) {
-    _mapBloc.add(SpooferMapLastMapStyleDarkSetRequested(value: value));
-  }
-
   void _showUiSnack(String message) {
     _messagesBloc.add(
       SpooferMessageShownRequested(
@@ -343,12 +335,6 @@ class _SpooferScreenState extends State<SpooferScreen>
         message: message,
       ),
     );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    unawaited(_applyMapStyle());
   }
 
   @override
@@ -483,6 +469,7 @@ class _SpooferScreenState extends State<SpooferScreen>
                             }
                             _addCustomPoint(position);
                           },
+                          mapStyle: _currentMapStyle(),
                         );
                       },
                     ),
@@ -682,6 +669,9 @@ class _SpooferScreenState extends State<SpooferScreen>
       if (!confirm) {
         return;
       }
+    }
+    if (!mounted) {
+      return;
     }
     _stopPlayback();
     context.read<SpooferRouteBloc>().add(const SpooferRouteClearRequested());
@@ -992,39 +982,8 @@ class _SpooferScreenState extends State<SpooferScreen>
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    _setMapLastMapStyleDark(null);
-    unawaited(_applyMapStyle(force: true));
-    unawaited(_retryInitialMapStyleApply());
     if (_mapState.pendingFitRoute) {
       _fitRouteToMap();
-    }
-  }
-
-  Future<void> _retryInitialMapStyleApply() async {
-    for (var attempt = 0; attempt < _initialMapStyleRetryCount; attempt += 1) {
-      await Future<void>.delayed(_initialMapStyleRetryDelay);
-      final applied = await _applyMapStyle(force: true);
-      if (applied) {
-        return;
-      }
-    }
-  }
-
-  Future<bool> _applyMapStyle({bool force = false}) async {
-    if (_mapController == null) {
-      return false;
-    }
-    final useDarkStyle = _shouldUseDarkMapStyle();
-    if (!force && _mapState.lastMapStyleDark == useDarkStyle) {
-      return true;
-    }
-    try {
-      await _mapController!.setMapStyle(useDarkStyle ? darkMapStyle : null);
-      _setMapLastMapStyleDark(useDarkStyle);
-      return true;
-    } catch (_) {
-      _setMapLastMapStyleDark(null);
-      return false;
     }
   }
 
@@ -1046,9 +1005,15 @@ class _SpooferScreenState extends State<SpooferScreen>
     }
   }
 
+  String? _currentMapStyle() {
+    return _shouldUseDarkMapStyle() ? darkMapStyle : null;
+  }
+
   void _applyDarkModeSetting(DarkModeSetting setting) {
     _settingsBloc.add(SpooferSettingsDarkModeSetRequested(value: setting));
-    unawaited(_applyMapStyle());
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadRouteFromInput() async {
@@ -1365,6 +1330,9 @@ class _SpooferScreenState extends State<SpooferScreen>
     final loadedState = await bloc.stream.firstWhere(
       (state) => state.revision > previousRevision,
     );
+    if (!mounted) {
+      return false;
+    }
     final routes = List<Map<String, Object?>>.from(loadedState.savedRoutes);
 
     if (routes.isEmpty) {
@@ -1375,12 +1343,12 @@ class _SpooferScreenState extends State<SpooferScreen>
       context: context,
       routes: routes,
       onApply: (index) {
-        context.read<SpooferRouteBloc>().add(
+        bloc.add(
           SpooferRouteSavedRouteApplyRequested(index: index),
         );
       },
       onDelete: (index) async {
-        context.read<SpooferRouteBloc>().add(
+        bloc.add(
           SpooferRouteSavedRouteDeleteRequested(index: index),
         );
         routes.removeAt(index);
@@ -1682,8 +1650,8 @@ class _SpooferScreenState extends State<SpooferScreen>
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
+      builder: (context) => PopScope<void>(
+        canPop: false,
         child: AlertDialog(
           title: const Text('Terms of Use'),
           content: const SingleChildScrollView(

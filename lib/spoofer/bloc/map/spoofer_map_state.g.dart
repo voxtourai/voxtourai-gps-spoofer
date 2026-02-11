@@ -122,5 +122,6 @@ class _$SpooferMapStateCWProxyImpl implements _$SpooferMapStateCWProxy {
 
 extension $SpooferMapStateCopyWith on SpooferMapState {
   /// Returns a callable class used to build a new instance with modified fields.
+  // ignore: library_private_types_in_public_api
   _$SpooferMapStateCWProxy get copyWith => _$SpooferMapStateCWProxyImpl(this);
 }

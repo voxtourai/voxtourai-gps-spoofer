@@ -103,5 +103,6 @@ class _$SpooferSettingsStateCWProxyImpl implements _$SpooferSettingsStateCWProxy
 
 extension $SpooferSettingsStateCopyWith on SpooferSettingsState {
   /// Returns a callable class used to build a new instance with modified fields.
+  // ignore: library_private_types_in_public_api
   _$SpooferSettingsStateCWProxy get copyWith => _$SpooferSettingsStateCWProxyImpl(this);
 }

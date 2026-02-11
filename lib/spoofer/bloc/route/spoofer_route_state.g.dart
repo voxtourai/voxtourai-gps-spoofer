@@ -165,5 +165,6 @@ class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
 
 extension $SpooferRouteStateCopyWith on SpooferRouteState {
   /// Returns a callable class used to build a new instance with modified fields.
+  // ignore: library_private_types_in_public_api
   _$SpooferRouteStateCWProxy get copyWith => _$SpooferRouteStateCWProxyImpl(this);
 }

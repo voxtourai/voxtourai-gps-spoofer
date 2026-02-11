@@ -147,5 +147,6 @@ class _$SpooferMockStateCWProxyImpl implements _$SpooferMockStateCWProxy {
 
 extension $SpooferMockStateCopyWith on SpooferMockState {
   /// Returns a callable class used to build a new instance with modified fields.
+  // ignore: library_private_types_in_public_api
   _$SpooferMockStateCWProxy get copyWith => _$SpooferMockStateCWProxyImpl(this);
 }

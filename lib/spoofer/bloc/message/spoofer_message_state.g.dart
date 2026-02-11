@@ -46,6 +46,7 @@ class _$SpooferMessageStateCWProxyImpl implements _$SpooferMessageStateCWProxy {
 
 extension $SpooferMessageStateCopyWith on SpooferMessageState {
   /// Returns a callable class used to build a new instance with modified fields.
+  // ignore: library_private_types_in_public_api
   _$SpooferMessageStateCWProxy get copyWith =>
       _$SpooferMessageStateCWProxyImpl(this);
 }

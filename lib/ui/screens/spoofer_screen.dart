@@ -43,6 +43,7 @@ import '../widgets/saved_routes_sheet.dart';
 import '../widgets/settings_side_sheet.dart';
 import '../widgets/spoofer_app_bar.dart';
 import '../widgets/spoofer_debug_panel.dart';
+import '../widgets/spoofer_google_map_view.dart';
 import '../widgets/waypoint_list_sheet.dart';
 import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
@@ -312,7 +313,13 @@ class _SpooferScreenState extends State<SpooferScreen>
                   children: [
                     BlocBuilder<SpooferMapBloc, SpooferMapState>(
                       builder: (context, mapState) {
-                        return Listener(
+                        return SpooferGoogleMapView(
+                          hasLocationPermission:
+                              mockState.hasLocationPermission == true,
+                          currentPosition: mapState.currentPosition,
+                          markers: mapState.markers,
+                          polylines: mapState.polylines,
+                          padding: _mapPaddingForCamera(context),
                           onPointerDown: (_) {
                             _activePointers += 1;
                             _userInteracting = true;
@@ -327,76 +334,57 @@ class _SpooferScreenState extends State<SpooferScreen>
                             _activePointers = 0;
                             _userInteracting = false;
                           },
-                          child: GoogleMap(
-                            key: ValueKey(
-                              'map-${mockState.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
-                            ),
-                            initialCameraPosition: CameraPosition(
-                              target:
-                                  mapState.currentPosition ??
-                                  const LatLng(0, 0),
-                              zoom: mapState.currentPosition == null ? 2 : 16,
-                            ),
-                            onMapCreated: _onMapCreated,
-                            onCameraMoveStarted: () {
-                              if (_userInteracting) {
-                                if (mapState.autoFollowEnabled) {
-                                  _setMapAutoFollow(false);
-                                }
-                                if (mapState.isProgrammaticMove) {
-                                  _setMapProgrammaticMove(false);
-                                }
-                                return;
-                              }
-                              if (mapState.isProgrammaticMove) {
-                                return;
-                              }
-                            },
-                            onCameraMove: (_) {
-                              if (_userInteracting &&
-                                  mapState.autoFollowEnabled) {
+                          onMapCreated: _onMapCreated,
+                          onCameraMoveStarted: () {
+                            if (_userInteracting) {
+                              if (mapState.autoFollowEnabled) {
                                 _setMapAutoFollow(false);
                               }
-                            },
-                            onCameraIdle: () {
                               if (mapState.isProgrammaticMove) {
                                 _setMapProgrammaticMove(false);
                               }
-                            },
-                            onTap: (position) {
-                              if (routeState.selectedWaypointIndex != null) {
-                                context.read<SpooferRouteBloc>().add(
-                                  const SpooferRouteWaypointSelectedRequested(
-                                    index: null,
-                                  ),
-                                );
-                                return;
-                              }
-                              if (routeState.hasPoints ||
-                                  routeState.hasWaypointPoints) {
-                                return;
-                              }
-                              _setManualLocation(position);
-                            },
-                            onLongPress: (position) {
-                              if (routeState.hasPoints &&
-                                  !routeState.usingCustomRoute) {
-                                _showUiSnack(
-                                  'Clear the loaded route to add points.',
-                                );
-                                return;
-                              }
-                              _addCustomPoint(position);
-                            },
-                            markers: mapState.markers,
-                            polylines: mapState.polylines,
-                            mapToolbarEnabled: false,
-                            padding: _mapPaddingForCamera(context),
-                            myLocationEnabled:
-                                mockState.hasLocationPermission == true,
-                            myLocationButtonEnabled: false,
-                            zoomControlsEnabled: false,
-                          ),
+                              return;
+                            }
+                            if (mapState.isProgrammaticMove) {
+                              return;
+                            }
+                          },
+                          onCameraMove: (_) {
+                            if (_userInteracting &&
+                                mapState.autoFollowEnabled) {
+                              _setMapAutoFollow(false);
+                            }
+                          },
+                          onCameraIdle: () {
+                            if (mapState.isProgrammaticMove) {
+                              _setMapProgrammaticMove(false);
+                            }
+                          },
+                          onTap: (position) {
+                            if (routeState.selectedWaypointIndex != null) {
+                              context.read<SpooferRouteBloc>().add(
+                                const SpooferRouteWaypointSelectedRequested(
+                                  index: null,
+                                ),
+                              );
+                              return;
+                            }
+                            if (routeState.hasPoints ||
+                                routeState.hasWaypointPoints) {
+                              return;
+                            }
+                            _setManualLocation(position);
+                          },
+                          onLongPress: (position) {
+                            if (routeState.hasPoints &&
+                                !routeState.usingCustomRoute) {
+                              _showUiSnack(
+                                'Clear the loaded route to add points.',
+                              );
+                              return;
+                            }
+                            _addCustomPoint(position);
+                          },
                         );
                       },
                     ),

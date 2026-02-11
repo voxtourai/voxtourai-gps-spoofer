@@ -80,6 +80,8 @@ class _SpooferScreenState extends State<SpooferScreen>
   _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
+  static const String _backgroundNotificationActionReset =
+      'reset_mock_location';
   static const int _initialMapStyleRetryCount = 3;
   static const Duration _initialMapStyleRetryDelay = Duration(
     milliseconds: 250,
@@ -125,21 +127,13 @@ class _SpooferScreenState extends State<SpooferScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_settingsState.backgroundEnabled) {
-      if (state == AppLifecycleState.paused ||
-          state == AppLifecycleState.inactive) {
-        unawaited(_showBackgroundNotification());
-      } else if (state == AppLifecycleState.resumed) {
-        unawaited(_cancelBackgroundNotification());
-      }
-      return;
-    }
     final playbackBloc = context.read<SpooferPlaybackBloc>();
     if (state == AppLifecycleState.resumed) {
       playbackBloc.add(const SpooferPlaybackAppResumed());
     } else {
       playbackBloc.add(const SpooferPlaybackAppPaused());
     }
+    unawaited(_syncBackgroundNotificationVisibility(appLifecycleState: state));
   }
 
   @override
@@ -158,7 +152,31 @@ class _SpooferScreenState extends State<SpooferScreen>
     final settings = flutter_local_notifications.InitializationSettings(
       android: androidSettings,
     );
-    await _notifications.initialize(settings);
+    await _notifications.initialize(
+      settings,
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
+    );
+  }
+
+  void _handleNotificationResponse(
+    flutter_local_notifications.NotificationResponse response,
+  ) {
+    if (response.actionId == _backgroundNotificationActionReset) {
+      unawaited(_handleResetFromBackgroundNotification());
+    }
+  }
+
+  Future<void> _handleResetFromBackgroundNotification() async {
+    if (!mounted) {
+      return;
+    }
+    _stopPlayback();
+    await _disableMockLocationAndRecenter();
+    if (!mounted) {
+      return;
+    }
+    _showUiOverlay('Mock location reset.');
+    await _syncBackgroundNotificationVisibility();
   }
 
   Future<void> _runFirstLaunchPrompts() async {
@@ -195,6 +213,16 @@ class _SpooferScreenState extends State<SpooferScreen>
           importance: flutter_local_notifications.Importance.low,
           priority: flutter_local_notifications.Priority.low,
           ongoing: true,
+          autoCancel: false,
+          actions:
+              const <flutter_local_notifications.AndroidNotificationAction>[
+                flutter_local_notifications.AndroidNotificationAction(
+                  _backgroundNotificationActionReset,
+                  'Reset location',
+                  cancelNotification: false,
+                  showsUserInterface: true,
+                ),
+              ],
           showWhen: false,
         );
     final details = flutter_local_notifications.NotificationDetails(
@@ -202,8 +230,8 @@ class _SpooferScreenState extends State<SpooferScreen>
     );
     await _notifications.show(
       _backgroundNotificationId,
-      'Background mode active',
-      'Mock GPS can keep running in the background.',
+      'GPS spoofing active',
+      'Location is actively being spoofed in the background.',
       details,
     );
     _settingsBloc.add(
@@ -221,6 +249,42 @@ class _SpooferScreenState extends State<SpooferScreen>
         value: false,
       ),
     );
+  }
+
+  bool _shouldShowBackgroundNotification({
+    SpooferPlaybackState? playbackState,
+    SpooferRouteState? routeState,
+    AppLifecycleState? appLifecycleState,
+  }) {
+    if (!_settingsState.backgroundEnabled) {
+      return false;
+    }
+    final playback = playbackState ?? context.read<SpooferPlaybackBloc>().state;
+    final route = routeState ?? context.read<SpooferRouteBloc>().state;
+    final lifecycle =
+        appLifecycleState ?? WidgetsBinding.instance.lifecycleState;
+    final appNotFocused =
+        lifecycle == AppLifecycleState.inactive ||
+        lifecycle == AppLifecycleState.paused ||
+        lifecycle == AppLifecycleState.hidden;
+    final activeSpoofing = playback.isPlaying && route.hasRoute;
+    return appNotFocused && activeSpoofing;
+  }
+
+  Future<void> _syncBackgroundNotificationVisibility({
+    SpooferPlaybackState? playbackState,
+    SpooferRouteState? routeState,
+    AppLifecycleState? appLifecycleState,
+  }) async {
+    if (_shouldShowBackgroundNotification(
+      playbackState: playbackState,
+      routeState: routeState,
+      appLifecycleState: appLifecycleState,
+    )) {
+      await _showBackgroundNotification();
+    } else {
+      await _cancelBackgroundNotification();
+    }
   }
 
   void _setMapCurrentPosition(
@@ -301,6 +365,17 @@ class _SpooferScreenState extends State<SpooferScreen>
               previous.tickSequence != current.tickSequence,
           listener: (context, playbackState) =>
               _handlePlaybackTick(playbackState),
+        ),
+        BlocListener<SpooferPlaybackBloc, SpooferPlaybackState>(
+          listenWhen: (previous, current) =>
+              previous.isPlaying != current.isPlaying,
+          listener: (context, playbackState) {
+            unawaited(
+              _syncBackgroundNotificationVisibility(
+                playbackState: playbackState,
+              ),
+            );
+          },
         ),
         BlocListener<SpooferMockBloc, SpooferMockState>(
           listener: (context, mockState) => _handleMockBlocState(mockState),
@@ -635,6 +710,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     }
     _setMapPolylines(_buildRoutePolylines(routeState.routePoints));
     _refreshMarkers(routeState);
+    unawaited(_syncBackgroundNotificationVisibility(routeState: routeState));
   }
 
   void _handleMockBlocState(SpooferMockState mockState) {
@@ -876,6 +952,7 @@ class _SpooferScreenState extends State<SpooferScreen>
         _settingsBloc.add(
           const SpooferSettingsBackgroundEnabledSetRequested(value: true),
         );
+        unawaited(_syncBackgroundNotificationVisibility());
         _showUiSnack(
           'Background mode enabled. Keep playback running to spoof.',
         );

@@ -41,6 +41,7 @@ import '../widgets/map_action_buttons.dart';
 import '../widgets/route_input_dialog.dart';
 import '../widgets/settings_side_sheet.dart';
 import '../widgets/spoofer_app_bar.dart';
+import '../widgets/spoofer_debug_panel.dart';
 import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
@@ -836,114 +837,13 @@ class _SpooferScreenState extends State<SpooferScreen>
   }
 
   Widget _buildDebugPanel(BuildContext context, SpooferMockState mockState) {
-    final status = mockState.lastMockStatus;
-    final theme = Theme.of(context);
-    if (!_settingsState.showDebugPanel) {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Debug', style: theme.textTheme.labelLarge),
-          const SizedBox(height: 4),
-          Text(
-            'Injected: ${_mapState.lastInjectedPosition == null ? '—' : '${_mapState.lastInjectedPosition!.latitude.toStringAsFixed(6)}, ${_mapState.lastInjectedPosition!.longitude.toStringAsFixed(6)}'}',
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            'Mock app selected: ${mockState.isMockLocationApp == null
-                ? '—'
-                : mockState.isMockLocationApp == true
-                ? 'YES'
-                : 'NO'}',
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            'Selected package: ${mockState.selectedMockApp ?? '—'}',
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            'GPS applied: ${status?['gpsApplied'] ?? '—'}',
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            'Fused applied: ${status?['fusedApplied'] ?? '—'}',
-            style: theme.textTheme.bodySmall,
-          ),
-          if (status?['gpsError'] != null)
-            Text(
-              'GPS error: ${status?['gpsError']}',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
-            ),
-          if (status?['addProviderError'] != null ||
-              status?['addProviderResult'] != null)
-            Text(
-              'addTestProvider: ${status?['addProviderResult'] ?? '—'} ${status?['addProviderError'] ?? ''}'
-                  .trim(),
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
-            ),
-          if (status?['enableProviderError'] != null ||
-              status?['enableProviderResult'] != null)
-            Text(
-              'setTestProviderEnabled: ${status?['enableProviderResult'] ?? '—'} ${status?['enableProviderError'] ?? ''}'
-                  .trim(),
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
-            ),
-          if (status?['statusProviderError'] != null ||
-              status?['statusProviderResult'] != null)
-            Text(
-              'setTestProviderStatus: ${status?['statusProviderResult'] ?? '—'} ${status?['statusProviderError'] ?? ''}'
-                  .trim(),
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
-            ),
-          if (status?['removeProviderError'] != null ||
-              status?['removeProviderResult'] != null)
-            Text(
-              'removeTestProvider: ${status?['removeProviderResult'] ?? '—'} ${status?['removeProviderError'] ?? ''}'
-                  .trim(),
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
-            ),
-          if (status?['fusedError'] != null)
-            Text(
-              'Fused error: ${status?['fusedError']}',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
-            ),
-          const SizedBox(height: 6),
-          Text('Log', style: theme.textTheme.labelLarge),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            constraints: const BoxConstraints(maxHeight: 220),
-            child: mockState.debugLog.isEmpty
-                ? Text('No debug events yet.', style: theme.textTheme.bodySmall)
-                : SingleChildScrollView(
-                    child: Text(
-                      mockState.debugLog.join('\n'),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ),
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: _refreshMockAppStatus,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Refresh mock status'),
-            ),
-          ),
-        ],
-      ),
+    return SpooferDebugPanel(
+      lastInjectedPosition: _mapState.lastInjectedPosition,
+      status: mockState.lastMockStatus,
+      isMockLocationApp: mockState.isMockLocationApp,
+      selectedMockApp: mockState.selectedMockApp,
+      debugLog: mockState.debugLog,
+      onRefreshMockStatus: _refreshMockAppStatus,
     );
   }
 

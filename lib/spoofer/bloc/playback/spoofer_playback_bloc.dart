@@ -53,7 +53,7 @@ class SpooferPlaybackBloc extends Bloc<SpooferPlaybackEvent, SpooferPlaybackStat
       state.copyWith(
         isPlaying: true,
         resumeAfterPause: false,
-        clearTickDeltaSeconds: true,
+        tickDeltaSeconds: null,
       ),
     );
   }
@@ -69,7 +69,7 @@ class SpooferPlaybackBloc extends Bloc<SpooferPlaybackEvent, SpooferPlaybackStat
     emit(
       state.copyWith(
         isPlaying: false,
-        clearTickDeltaSeconds: true,
+        tickDeltaSeconds: null,
       ),
     );
   }
@@ -97,7 +97,7 @@ class SpooferPlaybackBloc extends Bloc<SpooferPlaybackEvent, SpooferPlaybackStat
       state.copyWith(
         isPlaying: false,
         resumeAfterPause: true,
-        clearTickDeltaSeconds: true,
+        tickDeltaSeconds: null,
       ),
     );
   }
@@ -114,7 +114,7 @@ class SpooferPlaybackBloc extends Bloc<SpooferPlaybackEvent, SpooferPlaybackStat
       state.copyWith(
         isPlaying: true,
         resumeAfterPause: false,
-        clearTickDeltaSeconds: true,
+        tickDeltaSeconds: null,
       ),
     );
   }

@@ -1,6 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+
+part 'spoofer_playback_state.g.dart';
 
 @immutable
+@CopyWith()
 class SpooferPlaybackState {
   const SpooferPlaybackState({
     this.initialized = false,
@@ -17,25 +21,4 @@ class SpooferPlaybackState {
   final bool resumeAfterPause;
   final int tickSequence;
   final double? tickDeltaSeconds;
-
-  SpooferPlaybackState copyWith({
-    bool? initialized,
-    bool? isPlaying,
-    double? speedMps,
-    bool? resumeAfterPause,
-    int? tickSequence,
-    double? tickDeltaSeconds,
-    bool clearTickDeltaSeconds = false,
-  }) {
-    return SpooferPlaybackState(
-      initialized: initialized ?? this.initialized,
-      isPlaying: isPlaying ?? this.isPlaying,
-      speedMps: speedMps ?? this.speedMps,
-      resumeAfterPause: resumeAfterPause ?? this.resumeAfterPause,
-      tickSequence: tickSequence ?? this.tickSequence,
-      tickDeltaSeconds: clearTickDeltaSeconds
-          ? null
-          : (tickDeltaSeconds ?? this.tickDeltaSeconds),
-    );
-  }
 }

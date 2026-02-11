@@ -38,6 +38,7 @@ import '../map/map_style.dart';
 import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
 import '../widgets/map_action_buttons.dart';
+import '../widgets/route_input_dialog.dart';
 import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
@@ -539,106 +540,23 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   Future<void> _openRouteInputSheet() async {
-    final controller = TextEditingController(text: _routeController.text);
-    String? detectedPolyline;
     if (!mounted) {
       return;
     }
-    await showDialog<void>(
+    final input = await showDialog<String>(
       context: context,
-      builder: (context) {
-        return ValueListenableBuilder<TextEditingValue>(
-          valueListenable: controller,
-          builder: (context, value, _) {
-            final trimmed = value.text.trim();
-            final isEmpty = trimmed.isEmpty;
-            detectedPolyline = isEmpty ? null : _extractPolylineFromInput(trimmed);
-            return AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              title: Text(
-                'Load route',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      hintText: 'Paste encoded polyline or Routes API JSON',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      contentPadding: EdgeInsets.fromLTRB(12, 10, 12, 10),
-                    ),
-                  ),
-                  if (isEmpty) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Input required to load a route.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Theme.of(context).colorScheme.error),
-                      ),
-                    ),
-                  ] else if (detectedPolyline != null) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Polyline detected.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: Theme.of(context).colorScheme.primary),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                IconButton(
-                  tooltip: 'Clear',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: controller.clear,
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    controller.text = _samplePolyline;
-                    controller.selection = TextSelection.collapsed(
-                      offset: controller.text.length,
-                    );
-                    _showUiOverlay('Filled demo route.');
-                  },
-                  child: const Text('Demo'),
-                ),
-                FilledButton(
-                  onPressed: isEmpty
-                      ? null
-                      : () {
-                          _routeController.text = controller.text;
-                          Navigator.of(context).pop();
-                          _loadRouteFromInput();
-                        },
-                  child: const Text('Load'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => RouteInputDialog(
+        initialValue: _routeController.text,
+        sampleRoute: _samplePolyline,
+        detectPolyline: _extractPolylineFromInput,
+        onDemoFilled: () => _showUiOverlay('Filled demo route.'),
+      ),
     );
+    if (input == null) {
+      return;
+    }
+    _routeController.text = input;
+    _loadRouteFromInput();
   }
 
   void _clearMockLocation() {

@@ -107,6 +107,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       final accepted = await _ensureTosAccepted();
       if (accepted) {
         await _runFirstLaunchPrompts();
+        await _setBackgroundMode(true, showFeedback: false);
         if (!mounted) {
           return;
         }
@@ -256,9 +257,6 @@ class _SpooferScreenState extends State<SpooferScreen>
     SpooferRouteState? routeState,
     AppLifecycleState? appLifecycleState,
   }) {
-    if (!_settingsState.backgroundEnabled) {
-      return false;
-    }
     final playback = playbackState ?? context.read<SpooferPlaybackBloc>().state;
     final route = routeState ?? context.read<SpooferRouteBloc>().state;
     final lifecycle =
@@ -902,9 +900,14 @@ class _SpooferScreenState extends State<SpooferScreen>
         ),
       );
 
-  Future<bool> _setBackgroundMode(bool enabled) async {
+  Future<bool> _setBackgroundMode(
+    bool enabled, {
+    bool showFeedback = true,
+  }) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
-      _showUiSnack('Background mode is only supported on Android.');
+      if (showFeedback) {
+        _showUiSnack('Background mode is only supported on Android.');
+      }
       return false;
     }
 
@@ -922,9 +925,11 @@ class _SpooferScreenState extends State<SpooferScreen>
           _settingsBloc.add(
             const SpooferSettingsBackgroundEnabledSetRequested(value: false),
           );
-          _showUiSnack(
-            'Notification permission is required for background mode.',
-          );
+          if (showFeedback) {
+            _showUiSnack(
+              'Notification permission is required for background mode.',
+            );
+          }
           return false;
         }
 
@@ -932,30 +937,38 @@ class _SpooferScreenState extends State<SpooferScreen>
           androidConfig: _backgroundConfig,
         );
         if (!initialized) {
-          _showUiSnack(
-            'Please disable battery optimizations to enable background mode.',
-          );
+          if (showFeedback) {
+            _showUiSnack(
+              'Please disable battery optimizations to enable background mode.',
+            );
+          }
           return false;
         }
         final hasPermissions = await FlutterBackground.hasPermissions;
         if (!hasPermissions) {
-          _showUiSnack(
-            'Background permissions not granted. Disable battery optimizations and retry.',
-          );
+          if (showFeedback) {
+            _showUiSnack(
+              'Background permissions not granted. Disable battery optimizations and retry.',
+            );
+          }
           return false;
         }
         final success = await FlutterBackground.enableBackgroundExecution();
         if (!success) {
-          _showUiSnack('Failed to enable background mode.');
+          if (showFeedback) {
+            _showUiSnack('Failed to enable background mode.');
+          }
           return false;
         }
         _settingsBloc.add(
           const SpooferSettingsBackgroundEnabledSetRequested(value: true),
         );
         unawaited(_syncBackgroundNotificationVisibility());
-        _showUiSnack(
-          'Background mode enabled. Keep playback running to spoof.',
-        );
+        if (showFeedback) {
+          _showUiSnack(
+            'Background mode enabled. Keep playback running to spoof.',
+          );
+        }
         return true;
       } else {
         await FlutterBackground.disableBackgroundExecution();
@@ -966,7 +979,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         return true;
       }
     } catch (error) {
-      _showUiSnack('Background mode error: $error');
+      if (showFeedback) {
+        _showUiSnack('Background mode error: $error');
+      }
       return false;
     } finally {
       _settingsBloc.add(
@@ -1733,7 +1748,6 @@ class _SpooferScreenState extends State<SpooferScreen>
     await showSpooferSettingsSideSheet(
       context: context,
       initialSettings: _settingsState,
-      readSettings: () => _settingsState,
       onShowSetupBarChanged: (value) {
         _settingsBloc.add(
           SpooferSettingsShowSetupBarSetRequested(value: value),
@@ -1749,9 +1763,6 @@ class _SpooferScreenState extends State<SpooferScreen>
           SpooferSettingsShowMockMarkerSetRequested(value: value),
         );
         _refreshMarkers();
-      },
-      onBackgroundModeChanged: (value) async {
-        await _setBackgroundMode(value);
       },
       onDarkModeChanged: _applyDarkModeSetting,
       onDisableMockLocation: _disableMockLocationAndRecenter,

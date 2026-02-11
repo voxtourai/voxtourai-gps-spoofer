@@ -2,20 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../spoofer/bloc/settings/spoofer_settings_state.dart';
 
-typedef SettingsStateReader = SpooferSettingsState Function();
 typedef SettingsBoolChanged = void Function(bool value);
 typedef SettingsDarkModeChanged = void Function(DarkModeSetting value);
-typedef SettingsAsyncBoolChanged = Future<void> Function(bool value);
 typedef SettingsAsyncVoidCallback = Future<void> Function();
 
 Future<void> showSpooferSettingsSideSheet({
   required BuildContext context,
   required SpooferSettingsState initialSettings,
-  required SettingsStateReader readSettings,
   required SettingsBoolChanged onShowSetupBarChanged,
   required SettingsBoolChanged onShowDebugPanelChanged,
   required SettingsBoolChanged onShowMockMarkerChanged,
-  required SettingsAsyncBoolChanged onBackgroundModeChanged,
   required SettingsDarkModeChanged onDarkModeChanged,
   required SettingsAsyncVoidCallback onDisableMockLocation,
   required VoidCallback onRunSetupChecks,
@@ -29,11 +25,9 @@ Future<void> showSpooferSettingsSideSheet({
     pageBuilder: (context, animation, secondaryAnimation) {
       return _SpooferSettingsSideSheet(
         initialSettings: initialSettings,
-        readSettings: readSettings,
         onShowSetupBarChanged: onShowSetupBarChanged,
         onShowDebugPanelChanged: onShowDebugPanelChanged,
         onShowMockMarkerChanged: onShowMockMarkerChanged,
-        onBackgroundModeChanged: onBackgroundModeChanged,
         onDarkModeChanged: onDarkModeChanged,
         onDisableMockLocation: onDisableMockLocation,
         onRunSetupChecks: onRunSetupChecks,
@@ -53,11 +47,9 @@ Future<void> showSpooferSettingsSideSheet({
 class _SpooferSettingsSideSheet extends StatefulWidget {
   const _SpooferSettingsSideSheet({
     required this.initialSettings,
-    required this.readSettings,
     required this.onShowSetupBarChanged,
     required this.onShowDebugPanelChanged,
     required this.onShowMockMarkerChanged,
-    required this.onBackgroundModeChanged,
     required this.onDarkModeChanged,
     required this.onDisableMockLocation,
     required this.onRunSetupChecks,
@@ -65,11 +57,9 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
   });
 
   final SpooferSettingsState initialSettings;
-  final SettingsStateReader readSettings;
   final SettingsBoolChanged onShowSetupBarChanged;
   final SettingsBoolChanged onShowDebugPanelChanged;
   final SettingsBoolChanged onShowMockMarkerChanged;
-  final SettingsAsyncBoolChanged onBackgroundModeChanged;
   final SettingsDarkModeChanged onDarkModeChanged;
   final SettingsAsyncVoidCallback onDisableMockLocation;
   final VoidCallback onRunSetupChecks;
@@ -84,8 +74,6 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
   late bool _showSetupBar;
   late bool _showDebugPanel;
   late bool _showMockMarker;
-  late bool _backgroundEnabled;
-  late bool _backgroundBusy;
   late DarkModeSetting _darkModeSetting;
 
   static const _compactDensity = VisualDensity(horizontal: -2, vertical: -4);
@@ -97,32 +85,7 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
     _showSetupBar = state.showSetupBar;
     _showDebugPanel = state.showDebugPanel;
     _showMockMarker = state.showMockMarker;
-    _backgroundEnabled = state.backgroundEnabled;
-    _backgroundBusy = state.backgroundBusy;
     _darkModeSetting = state.darkModeSetting;
-  }
-
-  Future<void> _toggleBackground(bool value) async {
-    if (_backgroundBusy) {
-      return;
-    }
-    setState(() {
-      _backgroundEnabled = value;
-      _backgroundBusy = true;
-    });
-    try {
-      await widget.onBackgroundModeChanged(value);
-    } catch (_) {
-      // parent handles user-facing errors/snackbars
-    }
-    if (!mounted) {
-      return;
-    }
-    final refreshed = widget.readSettings();
-    setState(() {
-      _backgroundEnabled = refreshed.backgroundEnabled;
-      _backgroundBusy = false;
-    });
   }
 
   String _darkModeLabel(DarkModeSetting setting) {
@@ -202,23 +165,6 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                     });
                     widget.onShowMockMarkerChanged(value);
                   },
-                ),
-                ListTile(
-                  dense: true,
-                  visualDensity: _compactDensity,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text('Background mode', style: denseStyle),
-                  trailing: Transform.scale(
-                    scale: 0.85,
-                    child: Switch(
-                      value: _backgroundEnabled,
-                      onChanged: _backgroundBusy ? null : _toggleBackground,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  onTap: _backgroundBusy
-                      ? null
-                      : () => _toggleBackground(!_backgroundEnabled),
                 ),
                 ListTile(
                   dense: true,

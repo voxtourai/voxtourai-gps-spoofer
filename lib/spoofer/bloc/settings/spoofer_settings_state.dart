@@ -1,11 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-enum DarkModeSetting {
-  on,
-  uiOnly,
-  mapOnly,
-  off,
-}
+enum DarkModeSetting { on, uiOnly, mapOnly, off }
 
 @immutable
 class SpooferSettingsState {
@@ -13,7 +8,7 @@ class SpooferSettingsState {
     this.showMockMarker = false,
     this.showSetupBar = false,
     this.showDebugPanel = false,
-    this.backgroundEnabled = false,
+    this.backgroundEnabled = true,
     this.backgroundBusy = false,
     this.backgroundNotificationShown = false,
     this.darkModeSetting = DarkModeSetting.on,

@@ -37,15 +37,14 @@ import '../../spoofer/coordinator/spoofer_runtime_coordinator.dart';
 import '../map/map_style.dart';
 import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
-import '../widgets/map_action_buttons.dart';
 import '../widgets/route_input_dialog.dart';
 import '../widgets/saved_routes_sheet.dart';
 import '../widgets/settings_side_sheet.dart';
 import '../widgets/spoofer_app_bar.dart';
 import '../widgets/spoofer_debug_panel.dart';
 import '../widgets/spoofer_google_map_view.dart';
+import '../widgets/spoofer_map_overlays.dart';
 import '../widgets/waypoint_list_sheet.dart';
-import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
 
@@ -397,96 +396,49 @@ class _SpooferScreenState extends State<SpooferScreen>
                         final controlsVisible = routeState.hasRoute;
                         final double overlayBottom =
                             12 + (controlsVisible ? 0.0 : bottomInset);
-
-                        return Stack(
-                          children: [
-                            Positioned(
-                              right: 12,
-                              top: 12,
-                              child: MapActionButtons(
-                                hasRoute: hasRoute,
-                                hasPoints: routeState.hasPoints,
-                                isPlaying: playbackState.isPlaying,
-                                showWaypoints:
-                                    !(routeState.hasRoute &&
-                                        !routeState.usingCustomRoute),
-                                onLoadOrClear: routeState.hasPoints
-                                    ? _clearRoute
-                                    : _openRouteInputSheet,
-                                onTogglePlayback: hasRoute
-                                    ? _togglePlayback
-                                    : null,
-                                onOpenWaypoints: _openWaypointList,
-                              ),
-                            ),
-                            Positioned(
-                              right: 12,
-                              bottom: overlayBottom,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (hasRoute) ...[
-                                    FloatingActionButton.small(
-                                      heroTag: 'fitRoute',
-                                      onPressed: () {
-                                        _fitRouteToMap();
-                                        _showUiOverlay('Map fit to route');
-                                      },
-                                      tooltip: 'Fit route',
-                                      child: const Icon(Icons.fit_screen),
-                                    ),
-                                    const SizedBox(height: 8),
-                                  ],
-                                  FloatingActionButton.small(
-                                    heroTag: 'recenter',
-                                    onPressed: mapState.currentPosition == null
-                                        ? null
-                                        : () {
-                                            final wasAutoFollow =
-                                                mapState.autoFollowEnabled;
-                                            _setMapAutoFollow(true);
-                                            _followCamera(
-                                              mapState.currentPosition!,
-                                            );
-                                            if (!wasAutoFollow) {
-                                              _showUiOverlay(
-                                                'Auto-follow enabled',
-                                              );
-                                            }
-                                          },
-                                    tooltip: 'Recenter',
-                                    child: Icon(
-                                      mapState.autoFollowEnabled
-                                          ? Icons.my_location
-                                          : Icons.center_focus_strong,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (routeState.selectedWaypointIndex != null)
-                              Positioned(
-                                left: 12,
-                                right: 72,
-                                bottom: overlayBottom,
-                                child: WaypointActionRow(
-                                  onRename: () {
-                                    final idx =
-                                        routeState.selectedWaypointIndex;
-                                    if (idx != null) {
-                                      _renameCustomPoint(idx);
-                                    }
-                                  },
-                                  onDelete: () {
-                                    final idx =
-                                        routeState.selectedWaypointIndex;
-                                    if (idx != null) {
-                                      _removeCustomPoint(idx);
-                                    }
-                                  },
-                                ),
-                              ),
-                          ],
+                        return SpooferMapOverlays(
+                          hasRoute: hasRoute,
+                          hasPoints: routeState.hasPoints,
+                          isUsingCustomRoute: routeState.usingCustomRoute,
+                          selectedWaypointIndex:
+                              routeState.selectedWaypointIndex,
+                          isPlaying: playbackState.isPlaying,
+                          currentPosition: mapState.currentPosition,
+                          autoFollowEnabled: mapState.autoFollowEnabled,
+                          overlayBottom: overlayBottom,
+                          onLoadOrClear: routeState.hasPoints
+                              ? _clearRoute
+                              : _openRouteInputSheet,
+                          onTogglePlayback: hasRoute ? _togglePlayback : null,
+                          onOpenWaypoints: _openWaypointList,
+                          onFitRoute: () {
+                            _fitRouteToMap();
+                            _showUiOverlay('Map fit to route');
+                          },
+                          onRecenter: () {
+                            final currentPosition = mapState.currentPosition;
+                            if (currentPosition == null) {
+                              return;
+                            }
+                            final wasAutoFollow = mapState.autoFollowEnabled;
+                            _setMapAutoFollow(true);
+                            _followCamera(currentPosition);
+                            if (!wasAutoFollow) {
+                              _showUiOverlay('Auto-follow enabled');
+                            }
+                          },
+                          onRenameSelected: () {
+                            final idx = routeState.selectedWaypointIndex;
+                            if (idx != null) {
+                              _renameCustomPoint(idx);
+                            }
+                          },
+                          onDeleteSelected: () {
+                            final idx = routeState.selectedWaypointIndex;
+                            if (idx != null) {
+                              _removeCustomPoint(idx);
+                            }
+                          },
                         );
                       },
                     ),

@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+
+part 'spoofer_map_state.g.dart';
 
 @immutable
+@CopyWith()
 class SpooferMapState {
   const SpooferMapState({
     this.initialized = false,
@@ -24,33 +28,4 @@ class SpooferMapState {
   final bool pendingFitRoute;
   final bool isProgrammaticMove;
   final bool? lastMapStyleDark;
-
-  SpooferMapState copyWith({
-    bool? initialized,
-    LatLng? currentPosition,
-    bool clearCurrentPosition = false,
-    LatLng? lastInjectedPosition,
-    bool clearLastInjectedPosition = false,
-    Set<Polyline>? polylines,
-    Set<Marker>? markers,
-    bool? autoFollowEnabled,
-    bool? pendingFitRoute,
-    bool? isProgrammaticMove,
-    bool? lastMapStyleDark,
-    bool clearLastMapStyleDark = false,
-  }) {
-    return SpooferMapState(
-      initialized: initialized ?? this.initialized,
-      currentPosition: clearCurrentPosition ? null : (currentPosition ?? this.currentPosition),
-      lastInjectedPosition: clearLastInjectedPosition
-          ? null
-          : (lastInjectedPosition ?? this.lastInjectedPosition),
-      polylines: polylines ?? this.polylines,
-      markers: markers ?? this.markers,
-      autoFollowEnabled: autoFollowEnabled ?? this.autoFollowEnabled,
-      pendingFitRoute: pendingFitRoute ?? this.pendingFitRoute,
-      isProgrammaticMove: isProgrammaticMove ?? this.isProgrammaticMove,
-      lastMapStyleDark: clearLastMapStyleDark ? null : (lastMapStyleDark ?? this.lastMapStyleDark),
-    );
-  }
 }

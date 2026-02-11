@@ -37,7 +37,9 @@ class SpooferMapBloc extends Bloc<SpooferMapEvent, SpooferMapState> {
     emit(
       state.copyWith(
         currentPosition: event.position,
-        lastInjectedPosition: event.updateLastInjected ? event.position : null,
+        lastInjectedPosition: event.updateLastInjected
+            ? event.position
+            : state.lastInjectedPosition,
       ),
     );
   }

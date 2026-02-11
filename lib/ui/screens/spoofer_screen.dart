@@ -39,6 +39,7 @@ import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
 import '../widgets/map_action_buttons.dart';
 import '../widgets/route_input_dialog.dart';
+import '../widgets/settings_side_sheet.dart';
 import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
@@ -55,13 +56,15 @@ class SpooferScreen extends StatefulWidget {
   State<SpooferScreen> createState() => _SpooferScreenState();
 }
 
-class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserver {
+class _SpooferScreenState extends State<SpooferScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _routeController = TextEditingController();
 
   GoogleMapController? _mapController;
 
   final PreferencesController _prefs = PreferencesController();
-  final SpooferRuntimeCoordinator _coordinator = const SpooferRuntimeCoordinator();
+  final SpooferRuntimeCoordinator _coordinator =
+      const SpooferRuntimeCoordinator();
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
   int _lastRouteMessageId = -1;
@@ -69,11 +72,14 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   int _lastMockPromptId = -1;
   int _activePointers = 0;
   bool _userInteracting = false;
-  final flutter_local_notifications.FlutterLocalNotificationsPlugin _notifications =
+  final flutter_local_notifications.FlutterLocalNotificationsPlugin
+  _notifications =
       flutter_local_notifications.FlutterLocalNotificationsPlugin();
   static const int _backgroundNotificationId = 1001;
   static const int _initialMapStyleRetryCount = 3;
-  static const Duration _initialMapStyleRetryDelay = Duration(milliseconds: 250);
+  static const Duration _initialMapStyleRetryDelay = Duration(
+    milliseconds: 250,
+  );
   bool _tosAccepted = false;
   PackageInfo? _packageInfo;
   bool _packageInfoLoading = false;
@@ -112,7 +118,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_settingsState.backgroundEnabled) {
-      if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive) {
         unawaited(_showBackgroundNotification());
       } else if (state == AppLifecycleState.resumed) {
         unawaited(_cancelBackgroundNotification());
@@ -137,8 +144,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   Future<void> _initNotifications() async {
     final androidSettings =
-        flutter_local_notifications.AndroidInitializationSettings('@mipmap/ic_launcher');
-    final settings = flutter_local_notifications.InitializationSettings(android: androidSettings);
+        flutter_local_notifications.AndroidInitializationSettings(
+          '@mipmap/ic_launcher',
+        );
+    final settings = flutter_local_notifications.InitializationSettings(
+      android: androidSettings,
+    );
     await _notifications.initialize(settings);
   }
 
@@ -146,16 +157,19 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     if (_settingsState.backgroundNotificationShown) {
       return;
     }
-    final androidDetails = flutter_local_notifications.AndroidNotificationDetails(
-      'background_mode',
-      'Background mode',
-      channelDescription: 'Indicates mock GPS can run in the background.',
-      importance: flutter_local_notifications.Importance.low,
-      priority: flutter_local_notifications.Priority.low,
-      ongoing: true,
-      showWhen: false,
+    final androidDetails =
+        flutter_local_notifications.AndroidNotificationDetails(
+          'background_mode',
+          'Background mode',
+          channelDescription: 'Indicates mock GPS can run in the background.',
+          importance: flutter_local_notifications.Importance.low,
+          priority: flutter_local_notifications.Priority.low,
+          ongoing: true,
+          showWhen: false,
+        );
+    final details = flutter_local_notifications.NotificationDetails(
+      android: androidDetails,
     );
-    final details = flutter_local_notifications.NotificationDetails(android: androidDetails);
     await _notifications.show(
       _backgroundNotificationId,
       'Background mode active',
@@ -173,11 +187,16 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
     await _notifications.cancel(_backgroundNotificationId);
     _settingsBloc.add(
-      const SpooferSettingsBackgroundNotificationShownSetRequested(value: false),
+      const SpooferSettingsBackgroundNotificationShownSetRequested(
+        value: false,
+      ),
     );
   }
 
-  void _setMapCurrentPosition(LatLng? position, {bool updateLastInjected = false}) {
+  void _setMapCurrentPosition(
+    LatLng? position, {
+    bool updateLastInjected = false,
+  }) {
     _mapBloc.add(
       SpooferMapCurrentPositionSetRequested(
         position: position,
@@ -187,7 +206,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _setMapLastInjectedPosition(LatLng? position) {
-    _mapBloc.add(SpooferMapLastInjectedPositionSetRequested(position: position));
+    _mapBloc.add(
+      SpooferMapLastInjectedPositionSetRequested(position: position),
+    );
   }
 
   void _setMapPolylines(Set<Polyline> polylines) {
@@ -246,14 +267,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           listener: (context, routeState) => _handleRouteBlocState(routeState),
         ),
         BlocListener<SpooferPlaybackBloc, SpooferPlaybackState>(
-          listenWhen: (previous, current) => previous.tickSequence != current.tickSequence,
-          listener: (context, playbackState) => _handlePlaybackTick(playbackState),
+          listenWhen: (previous, current) =>
+              previous.tickSequence != current.tickSequence,
+          listener: (context, playbackState) =>
+              _handlePlaybackTick(playbackState),
         ),
         BlocListener<SpooferMockBloc, SpooferMockState>(
           listener: (context, mockState) => _handleMockBlocState(mockState),
         ),
         BlocListener<SpooferMessageBloc, SpooferMessageState>(
-          listener: (context, messageState) => _handleUiMessageState(messageState),
+          listener: (context, messageState) =>
+              _handleUiMessageState(messageState),
         ),
       ],
       child: BlocBuilder<SpooferRouteBloc, SpooferRouteState>(
@@ -264,231 +288,293 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                 builder: (context, mockState) {
                   return BlocBuilder<SpooferSettingsBloc, SpooferSettingsState>(
                     builder: (context, settingsState) {
-                  return Scaffold(
-                    appBar: AppBar(
-                      toolbarHeight: 48,
-                      title: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _handleTitleTap,
-                        child: const Text('GPS Spoofer'),
-                      ),
-                      actions: [
-                        IconButton(
-                          tooltip: 'Search',
-                          icon: const Icon(Icons.search),
-                          onPressed: _openSearchScreen,
+                      return Scaffold(
+                        appBar: AppBar(
+                          toolbarHeight: 48,
+                          title: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _handleTitleTap,
+                            child: const Text('GPS Spoofer'),
+                          ),
+                          actions: [
+                            IconButton(
+                              tooltip: 'Search',
+                              icon: const Icon(Icons.search),
+                              onPressed: _openSearchScreen,
+                            ),
+                            IconButton(
+                              tooltip: 'Help',
+                              icon: const Icon(Icons.help_outline),
+                              onPressed: _openHelpScreen,
+                            ),
+                            IconButton(
+                              tooltip: 'Settings',
+                              icon: const Icon(Icons.settings),
+                              onPressed: _openSettingsSheet,
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          tooltip: 'Help',
-                          icon: const Icon(Icons.help_outline),
-                          onPressed: _openHelpScreen,
-                        ),
-                        IconButton(
-                          tooltip: 'Settings',
-                          icon: const Icon(Icons.settings),
-                          onPressed: _openSettingsSheet,
-                        ),
-                      ],
-                    ),
-                    body: Column(
-                      children: [
-                        Expanded(
-                          flex: 15,
-                          child: Stack(
-                            children: [
-                              BlocBuilder<SpooferMapBloc, SpooferMapState>(
-                                builder: (context, mapState) {
-                                  return Listener(
-                                    onPointerDown: (_) {
-                                      _activePointers += 1;
-                                      _userInteracting = true;
-                                    },
-                                    onPointerUp: (_) {
-                                      _activePointers = math.max(0, _activePointers - 1);
-                                      if (_activePointers == 0) {
-                                        _userInteracting = false;
-                                      }
-                                    },
-                                    onPointerCancel: (_) {
-                                      _activePointers = 0;
-                                      _userInteracting = false;
-                                    },
-                                    child: GoogleMap(
-                                      key: ValueKey(
-                                        'map-${mockState.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
-                                      ),
-                                      initialCameraPosition: CameraPosition(
-                                        target: mapState.currentPosition ?? const LatLng(0, 0),
-                                        zoom: mapState.currentPosition == null ? 2 : 16,
-                                      ),
-                                      onMapCreated: _onMapCreated,
-                                      onCameraMoveStarted: () {
-                                        if (_userInteracting) {
-                                          if (mapState.autoFollowEnabled) {
-                                            _setMapAutoFollow(false);
+                        body: Column(
+                          children: [
+                            Expanded(
+                              flex: 15,
+                              child: Stack(
+                                children: [
+                                  BlocBuilder<SpooferMapBloc, SpooferMapState>(
+                                    builder: (context, mapState) {
+                                      return Listener(
+                                        onPointerDown: (_) {
+                                          _activePointers += 1;
+                                          _userInteracting = true;
+                                        },
+                                        onPointerUp: (_) {
+                                          _activePointers = math.max(
+                                            0,
+                                            _activePointers - 1,
+                                          );
+                                          if (_activePointers == 0) {
+                                            _userInteracting = false;
                                           }
-                                          if (mapState.isProgrammaticMove) {
-                                            _setMapProgrammaticMove(false);
-                                          }
-                                          return;
-                                        }
-                                        if (mapState.isProgrammaticMove) {
-                                          return;
-                                        }
-                                      },
-                                      onCameraMove: (_) {
-                                        if (_userInteracting && mapState.autoFollowEnabled) {
-                                          _setMapAutoFollow(false);
-                                        }
-                                      },
-                                      onCameraIdle: () {
-                                        if (mapState.isProgrammaticMove) {
-                                          _setMapProgrammaticMove(false);
-                                        }
-                                      },
-                                      onTap: (position) {
-                                        if (routeState.selectedWaypointIndex != null) {
-                                          context.read<SpooferRouteBloc>().add(
-                                                const SpooferRouteWaypointSelectedRequested(index: null),
+                                        },
+                                        onPointerCancel: (_) {
+                                          _activePointers = 0;
+                                          _userInteracting = false;
+                                        },
+                                        child: GoogleMap(
+                                          key: ValueKey(
+                                            'map-${mockState.hasLocationPermission == true ? 'loc-on' : 'loc-off'}',
+                                          ),
+                                          initialCameraPosition: CameraPosition(
+                                            target:
+                                                mapState.currentPosition ??
+                                                const LatLng(0, 0),
+                                            zoom:
+                                                mapState.currentPosition == null
+                                                ? 2
+                                                : 16,
+                                          ),
+                                          onMapCreated: _onMapCreated,
+                                          onCameraMoveStarted: () {
+                                            if (_userInteracting) {
+                                              if (mapState.autoFollowEnabled) {
+                                                _setMapAutoFollow(false);
+                                              }
+                                              if (mapState.isProgrammaticMove) {
+                                                _setMapProgrammaticMove(false);
+                                              }
+                                              return;
+                                            }
+                                            if (mapState.isProgrammaticMove) {
+                                              return;
+                                            }
+                                          },
+                                          onCameraMove: (_) {
+                                            if (_userInteracting &&
+                                                mapState.autoFollowEnabled) {
+                                              _setMapAutoFollow(false);
+                                            }
+                                          },
+                                          onCameraIdle: () {
+                                            if (mapState.isProgrammaticMove) {
+                                              _setMapProgrammaticMove(false);
+                                            }
+                                          },
+                                          onTap: (position) {
+                                            if (routeState
+                                                    .selectedWaypointIndex !=
+                                                null) {
+                                              context.read<SpooferRouteBloc>().add(
+                                                const SpooferRouteWaypointSelectedRequested(
+                                                  index: null,
+                                                ),
                                               );
-                                          return;
-                                        }
-                                        if (routeState.hasPoints || routeState.hasWaypointPoints) {
-                                          return;
-                                        }
-                                        _setManualLocation(position);
-                                      },
-                                      onLongPress: (position) {
-                                        if (routeState.hasPoints && !routeState.usingCustomRoute) {
-                                          _showUiSnack('Clear the loaded route to add points.');
-                                          return;
-                                        }
-                                        _addCustomPoint(position);
-                                      },
-                                      markers: mapState.markers,
-                                      polylines: mapState.polylines,
-                                      mapToolbarEnabled: false,
-                                      padding: _mapPaddingForCamera(context),
-                                      myLocationEnabled: mockState.hasLocationPermission == true,
-                                      myLocationButtonEnabled: false,
-                                      zoomControlsEnabled: false,
-                                    ),
-                                  );
-                                },
-                              ),
-                              BlocBuilder<SpooferMapBloc, SpooferMapState>(
-                                builder: (context, mapState) {
-                                  final hasRoute = routeState.hasRoute;
-                                  final bottomInset = MediaQuery.of(context).padding.bottom;
-                                  final controlsVisible = routeState.hasRoute;
-                                  final double overlayBottom = 12 + (controlsVisible ? 0.0 : bottomInset);
-
-                                  return Stack(
-                                    children: [
-                                      Positioned(
-                                        right: 12,
-                                        top: 12,
-                                        child: MapActionButtons(
-                                          hasRoute: hasRoute,
-                                          hasPoints: routeState.hasPoints,
-                                          isPlaying: playbackState.isPlaying,
-                                          showWaypoints: !(routeState.hasRoute && !routeState.usingCustomRoute),
-                                          onLoadOrClear: routeState.hasPoints ? _clearRoute : _openRouteInputSheet,
-                                          onTogglePlayback: hasRoute ? _togglePlayback : null,
-                                          onOpenWaypoints: _openWaypointList,
+                                              return;
+                                            }
+                                            if (routeState.hasPoints ||
+                                                routeState.hasWaypointPoints) {
+                                              return;
+                                            }
+                                            _setManualLocation(position);
+                                          },
+                                          onLongPress: (position) {
+                                            if (routeState.hasPoints &&
+                                                !routeState.usingCustomRoute) {
+                                              _showUiSnack(
+                                                'Clear the loaded route to add points.',
+                                              );
+                                              return;
+                                            }
+                                            _addCustomPoint(position);
+                                          },
+                                          markers: mapState.markers,
+                                          polylines: mapState.polylines,
+                                          mapToolbarEnabled: false,
+                                          padding: _mapPaddingForCamera(
+                                            context,
+                                          ),
+                                          myLocationEnabled:
+                                              mockState.hasLocationPermission ==
+                                              true,
+                                          myLocationButtonEnabled: false,
+                                          zoomControlsEnabled: false,
                                         ),
-                                      ),
-                                      Positioned(
-                                        right: 12,
-                                        bottom: overlayBottom,
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (hasRoute) ...[
-                                              FloatingActionButton.small(
-                                                heroTag: 'fitRoute',
-                                                onPressed: () {
-                                                  _fitRouteToMap();
-                                                  _showUiOverlay('Map fit to route');
-                                                },
-                                                tooltip: 'Fit route',
-                                                child: const Icon(Icons.fit_screen),
-                                              ),
-                                              const SizedBox(height: 8),
-                                            ],
-                                            FloatingActionButton.small(
-                                              heroTag: 'recenter',
-                                              onPressed: mapState.currentPosition == null
-                                                  ? null
-                                                  : () {
-                                                      final wasAutoFollow = mapState.autoFollowEnabled;
-                                                      _setMapAutoFollow(true);
-                                                      _followCamera(mapState.currentPosition!);
-                                                      if (!wasAutoFollow) {
-                                                        _showUiOverlay('Auto-follow enabled');
-                                                      }
+                                      );
+                                    },
+                                  ),
+                                  BlocBuilder<SpooferMapBloc, SpooferMapState>(
+                                    builder: (context, mapState) {
+                                      final hasRoute = routeState.hasRoute;
+                                      final bottomInset = MediaQuery.of(
+                                        context,
+                                      ).padding.bottom;
+                                      final controlsVisible =
+                                          routeState.hasRoute;
+                                      final double overlayBottom =
+                                          12 +
+                                          (controlsVisible ? 0.0 : bottomInset);
+
+                                      return Stack(
+                                        children: [
+                                          Positioned(
+                                            right: 12,
+                                            top: 12,
+                                            child: MapActionButtons(
+                                              hasRoute: hasRoute,
+                                              hasPoints: routeState.hasPoints,
+                                              isPlaying:
+                                                  playbackState.isPlaying,
+                                              showWaypoints:
+                                                  !(routeState.hasRoute &&
+                                                      !routeState
+                                                          .usingCustomRoute),
+                                              onLoadOrClear:
+                                                  routeState.hasPoints
+                                                  ? _clearRoute
+                                                  : _openRouteInputSheet,
+                                              onTogglePlayback: hasRoute
+                                                  ? _togglePlayback
+                                                  : null,
+                                              onOpenWaypoints:
+                                                  _openWaypointList,
+                                            ),
+                                          ),
+                                          Positioned(
+                                            right: 12,
+                                            bottom: overlayBottom,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (hasRoute) ...[
+                                                  FloatingActionButton.small(
+                                                    heroTag: 'fitRoute',
+                                                    onPressed: () {
+                                                      _fitRouteToMap();
+                                                      _showUiOverlay(
+                                                        'Map fit to route',
+                                                      );
                                                     },
-                                              tooltip: 'Recenter',
-                                              child: Icon(
-                                                mapState.autoFollowEnabled
-                                                    ? Icons.my_location
-                                                    : Icons.center_focus_strong,
+                                                    tooltip: 'Fit route',
+                                                    child: const Icon(
+                                                      Icons.fit_screen,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                ],
+                                                FloatingActionButton.small(
+                                                  heroTag: 'recenter',
+                                                  onPressed:
+                                                      mapState.currentPosition ==
+                                                          null
+                                                      ? null
+                                                      : () {
+                                                          final wasAutoFollow =
+                                                              mapState
+                                                                  .autoFollowEnabled;
+                                                          _setMapAutoFollow(
+                                                            true,
+                                                          );
+                                                          _followCamera(
+                                                            mapState
+                                                                .currentPosition!,
+                                                          );
+                                                          if (!wasAutoFollow) {
+                                                            _showUiOverlay(
+                                                              'Auto-follow enabled',
+                                                            );
+                                                          }
+                                                        },
+                                                  tooltip: 'Recenter',
+                                                  child: Icon(
+                                                    mapState.autoFollowEnabled
+                                                        ? Icons.my_location
+                                                        : Icons
+                                                              .center_focus_strong,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (routeState
+                                                  .selectedWaypointIndex !=
+                                              null)
+                                            Positioned(
+                                              left: 12,
+                                              right: 72,
+                                              bottom: overlayBottom,
+                                              child: WaypointActionRow(
+                                                onRename: () {
+                                                  final idx = routeState
+                                                      .selectedWaypointIndex;
+                                                  if (idx != null) {
+                                                    _renameCustomPoint(idx);
+                                                  }
+                                                },
+                                                onDelete: () {
+                                                  final idx = routeState
+                                                      .selectedWaypointIndex;
+                                                  if (idx != null) {
+                                                    _removeCustomPoint(idx);
+                                                  }
+                                                },
                                               ),
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (routeState.selectedWaypointIndex != null)
-                                        Positioned(
-                                          left: 12,
-                                          right: 72,
-                                          bottom: overlayBottom,
-                                          child: WaypointActionRow(
-                                            onRename: () {
-                                              final idx = routeState.selectedWaypointIndex;
-                                              if (idx != null) {
-                                                _renameCustomPoint(idx);
-                                              }
-                                            },
-                                            onDelete: () {
-                                              final idx = routeState.selectedWaypointIndex;
-                                              if (idx != null) {
-                                                _removeCustomPoint(idx);
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          transitionBuilder: (child, animation) => SizeTransition(
-                            sizeFactor: animation,
-                            axisAlignment: -1,
-                            child: FadeTransition(opacity: animation, child: child),
-                          ),
-                          child: routeState.hasRoute
-                              ? SafeArea(
-                                  key: const ValueKey('controls'),
-                                  top: false,
-                                  child: _buildControls(
-                                    context,
-                                    routeState,
-                                    playbackState,
-                                    mockState,
-                                    settingsState,
+                                        ],
+                                      );
+                                    },
                                   ),
-                                )
-                              : const SizedBox.shrink(key: ValueKey('no-controls')),
+                                ],
+                              ),
+                            ),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              transitionBuilder: (child, animation) =>
+                                  SizeTransition(
+                                    sizeFactor: animation,
+                                    axisAlignment: -1,
+                                    child: FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
+                                  ),
+                              child: routeState.hasRoute
+                                  ? SafeArea(
+                                      key: const ValueKey('controls'),
+                                      top: false,
+                                      child: _buildControls(
+                                        context,
+                                        routeState,
+                                        playbackState,
+                                        mockState,
+                                        settingsState,
+                                      ),
+                                    )
+                                  : const SizedBox.shrink(
+                                      key: ValueKey('no-controls'),
+                                    ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
+                      );
                     },
                   );
                 },
@@ -515,7 +601,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
     return ControlsPanel(
       showSetupBar: settingsState.showSetupBar,
-      setupLabel: 'Setup: '
+      setupLabel:
+          'Setup: '
           'location ${_statusLabel(mockState.hasLocationPermission)} · '
           'dev ${_statusLabel(mockState.isDeveloperModeEnabled)} · '
           'mock ${_statusLabel(mockState.isMockLocationApp)}',
@@ -525,15 +612,17 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       progress: _clamp01(routeState.progress),
       onProgressChanged: hasRoute
           ? (value) {
-              context.read<SpooferPlaybackBloc>().add(const SpooferPlaybackTickClockResetRequested());
+              context.read<SpooferPlaybackBloc>().add(
+                const SpooferPlaybackTickClockResetRequested(),
+              );
               _setProgress(value);
             }
           : null,
       speedMps: playbackState.speedMps,
       onSpeedChanged: (value) {
         context.read<SpooferPlaybackBloc>().add(
-              SpooferPlaybackSpeedSetRequested(speedMps: value),
-            );
+          SpooferPlaybackSpeedSetRequested(speedMps: value),
+        );
       },
       mockError: mockState.mockError,
     );
@@ -560,7 +649,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _clearMockLocation() {
-    context.read<SpooferMockBloc>().add(const SpooferMockClearLocationRequested());
+    context.read<SpooferMockBloc>().add(
+      const SpooferMockClearLocationRequested(),
+    );
   }
 
   Future<LatLng?> _getRealLocation() async {
@@ -592,7 +683,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _appendDebugLog(String message) {
-    context.read<SpooferMockBloc>().add(SpooferMockDebugLogAppended(message: message));
+    context.read<SpooferMockBloc>().add(
+      SpooferMockDebugLogAppended(message: message),
+    );
   }
 
   void _handleRouteBlocState(SpooferRouteState routeState) {
@@ -601,7 +694,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _lastRouteMessageId = message.id;
       _showUiSnack(message.text);
     }
-    if (!routeState.hasRoute && context.read<SpooferPlaybackBloc>().state.isPlaying) {
+    if (!routeState.hasRoute &&
+        context.read<SpooferPlaybackBloc>().state.isPlaying) {
       _stopPlayback();
     }
     _setMapPolylines(_buildRoutePolylines(routeState.routePoints));
@@ -634,11 +728,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     context.read<SpooferMockBloc>().add(
-          SpooferMockPromptResolved(
-            promptId: prompt.id,
-            accepted: accepted,
-          ),
-        );
+      SpooferMockPromptResolved(promptId: prompt.id, accepted: accepted),
+    );
   }
 
   void _handlePlaybackTick(SpooferPlaybackState playbackState) {
@@ -689,7 +780,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _handleTitleTap() {
     final now = DateTime.now();
-    if (_lastTitleTapAt == null || now.difference(_lastTitleTapAt!) > const Duration(seconds: 2)) {
+    if (_lastTitleTapAt == null ||
+        now.difference(_lastTitleTapAt!) > const Duration(seconds: 2)) {
       _titleTapCount = 0;
     }
     _lastTitleTapAt = now;
@@ -799,7 +891,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             style: theme.textTheme.bodySmall,
           ),
           Text(
-            'Mock app selected: ${mockState.isMockLocationApp == null ? '—' : mockState.isMockLocationApp == true ? 'YES' : 'NO'}',
+            'Mock app selected: ${mockState.isMockLocationApp == null
+                ? '—'
+                : mockState.isMockLocationApp == true
+                ? 'YES'
+                : 'NO'}',
             style: theme.textTheme.bodySmall,
           ),
           Text(
@@ -819,23 +915,29 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
               'GPS error: ${status?['gpsError']}',
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
             ),
-          if (status?['addProviderError'] != null || status?['addProviderResult'] != null)
+          if (status?['addProviderError'] != null ||
+              status?['addProviderResult'] != null)
             Text(
-              'addTestProvider: ${status?['addProviderResult'] ?? '—'} ${status?['addProviderError'] ?? ''}'.trim(),
+              'addTestProvider: ${status?['addProviderResult'] ?? '—'} ${status?['addProviderError'] ?? ''}'
+                  .trim(),
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
             ),
-          if (status?['enableProviderError'] != null || status?['enableProviderResult'] != null)
+          if (status?['enableProviderError'] != null ||
+              status?['enableProviderResult'] != null)
             Text(
-              'setTestProviderEnabled: ${status?['enableProviderResult'] ?? '—'} ${status?['enableProviderError'] ?? ''}'.trim(),
+              'setTestProviderEnabled: ${status?['enableProviderResult'] ?? '—'} ${status?['enableProviderError'] ?? ''}'
+                  .trim(),
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
             ),
-          if (status?['statusProviderError'] != null || status?['statusProviderResult'] != null)
+          if (status?['statusProviderError'] != null ||
+              status?['statusProviderResult'] != null)
             Text(
               'setTestProviderStatus: ${status?['statusProviderResult'] ?? '—'} ${status?['statusProviderError'] ?? ''}'
                   .trim(),
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
             ),
-          if (status?['removeProviderError'] != null || status?['removeProviderResult'] != null)
+          if (status?['removeProviderError'] != null ||
+              status?['removeProviderResult'] != null)
             Text(
               'removeTestProvider: ${status?['removeProviderResult'] ?? '—'} ${status?['removeProviderError'] ?? ''}'
                   .trim(),
@@ -859,7 +961,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             child: mockState.debugLog.isEmpty
                 ? Text('No debug events yet.', style: theme.textTheme.bodySmall)
                 : SingleChildScrollView(
-                    child: Text(mockState.debugLog.join('\n'), style: theme.textTheme.bodySmall),
+                    child: Text(
+                      mockState.debugLog.join('\n'),
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ),
           ),
           const SizedBox(height: 4),
@@ -876,12 +981,16 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
-  static const FlutterBackgroundAndroidConfig _backgroundConfig = FlutterBackgroundAndroidConfig(
-    notificationTitle: 'GPS Spoofer',
-    notificationText: 'Mock location running in background',
-    notificationImportance: AndroidNotificationImportance.normal,
-    notificationIcon: AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
-  );
+  static const FlutterBackgroundAndroidConfig _backgroundConfig =
+      FlutterBackgroundAndroidConfig(
+        notificationTitle: 'GPS Spoofer',
+        notificationText: 'Mock location running in background',
+        notificationImportance: AndroidNotificationImportance.normal,
+        notificationIcon: AndroidResource(
+          name: 'ic_launcher',
+          defType: 'mipmap',
+        ),
+      );
 
   Future<bool> _setBackgroundMode(bool enabled) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
@@ -889,19 +998,27 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return false;
     }
 
-    _settingsBloc.add(const SpooferSettingsBackgroundBusySetRequested(value: true));
+    _settingsBloc.add(
+      const SpooferSettingsBackgroundBusySetRequested(value: true),
+    );
 
     try {
       if (enabled) {
         final notificationStatus = await Permission.notification.request();
         if (!notificationStatus.isGranted) {
-          _showUiSnack('Notification permission is required for background mode.');
+          _showUiSnack(
+            'Notification permission is required for background mode.',
+          );
           return false;
         }
 
-        final initialized = await FlutterBackground.initialize(androidConfig: _backgroundConfig);
+        final initialized = await FlutterBackground.initialize(
+          androidConfig: _backgroundConfig,
+        );
         if (!initialized) {
-          _showUiSnack('Please disable battery optimizations to enable background mode.');
+          _showUiSnack(
+            'Please disable battery optimizations to enable background mode.',
+          );
           return false;
         }
         final hasPermissions = await FlutterBackground.hasPermissions;
@@ -916,12 +1033,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           _showUiSnack('Failed to enable background mode.');
           return false;
         }
-        _settingsBloc.add(const SpooferSettingsBackgroundEnabledSetRequested(value: true));
-        _showUiSnack('Background mode enabled. Keep playback running to spoof.');
+        _settingsBloc.add(
+          const SpooferSettingsBackgroundEnabledSetRequested(value: true),
+        );
+        _showUiSnack(
+          'Background mode enabled. Keep playback running to spoof.',
+        );
         return true;
       } else {
         await FlutterBackground.disableBackgroundExecution();
-        _settingsBloc.add(const SpooferSettingsBackgroundEnabledSetRequested(value: false));
+        _settingsBloc.add(
+          const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+        );
         unawaited(_cancelBackgroundNotification());
         return true;
       }
@@ -929,7 +1052,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _showUiSnack('Background mode error: $error');
       return false;
     } finally {
-      _settingsBloc.add(const SpooferSettingsBackgroundBusySetRequested(value: false));
+      _settingsBloc.add(
+        const SpooferSettingsBackgroundBusySetRequested(value: false),
+      );
     }
   }
 
@@ -974,7 +1099,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   bool _shouldUseDarkMapStyle() {
     switch (_settingsState.darkModeSetting) {
       case DarkModeSetting.on:
-        return scheduler.SchedulerBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+        return scheduler
+                .SchedulerBinding
+                .instance
+                .platformDispatcher
+                .platformBrightness ==
+            Brightness.dark;
       case DarkModeSetting.uiOnly:
         return false;
       case DarkModeSetting.mapOnly:
@@ -1003,12 +1133,15 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     bloc.add(SpooferRouteLoadRequested(input: input));
 
     try {
-      final nextState = await bloc.stream.firstWhere((state) => state.revision > previousRevision);
+      final nextState = await bloc.stream.firstWhere(
+        (state) => state.revision > previousRevision,
+      );
       if (!mounted) {
         return;
       }
       if (nextState.hasRoute) {
-        final position = nextState.currentRoutePosition ?? nextState.routePoints.first;
+        final position =
+            nextState.currentRoutePosition ?? nextState.routePoints.first;
         _setMapCurrentPosition(position, updateLastInjected: true);
         _refreshMarkers(nextState);
         unawaited(_sendMockLocation(position));
@@ -1036,7 +1169,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       } catch (_) {
         // Fall back to regex or raw input.
       }
-      final match = RegExp(r'encodedPolyline\"?\s*:\s*\"([^\"]+)\"').firstMatch(unquoted);
+      final match = RegExp(
+        r'encodedPolyline\"?\s*:\s*\"([^\"]+)\"',
+      ).firstMatch(unquoted);
       if (match != null) {
         return match.group(1);
       }
@@ -1073,7 +1208,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   String? _extractPolylineFromMap(Map<String, dynamic> map) {
-    final direct = map['encodedPolyline'] ?? map['routePolyline'] ?? map['polyline'];
+    final direct =
+        map['encodedPolyline'] ?? map['routePolyline'] ?? map['polyline'];
     if (direct is String) {
       return direct;
     }
@@ -1099,20 +1235,23 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
   }
 
-
   void _startPlayback() {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (!routeState.hasRoute || routeState.totalDistanceMeters == 0) {
       return;
     }
-    context.read<SpooferPlaybackBloc>().add(const SpooferPlaybackPlayRequested());
+    context.read<SpooferPlaybackBloc>().add(
+      const SpooferPlaybackPlayRequested(),
+    );
   }
 
   void _stopPlayback() {
     if (!context.read<SpooferPlaybackBloc>().state.isPlaying) {
       return;
     }
-    context.read<SpooferPlaybackBloc>().add(const SpooferPlaybackPauseRequested());
+    context.read<SpooferPlaybackBloc>().add(
+      const SpooferPlaybackPauseRequested(),
+    );
   }
 
   void _setProgress(double value) {
@@ -1122,8 +1261,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     }
 
     final clamped = _clamp01(value);
-    final position = _coordinator.positionForProgress(routeState, clamped) ?? routeState.routePoints.first;
-    context.read<SpooferRouteBloc>().add(SpooferRouteProgressSetRequested(progress: clamped));
+    final position =
+        _coordinator.positionForProgress(routeState, clamped) ??
+        routeState.routePoints.first;
+    context.read<SpooferRouteBloc>().add(
+      SpooferRouteProgressSetRequested(progress: clamped),
+    );
 
     _setMapCurrentPosition(position, updateLastInjected: true);
     _refreshMarkers(routeState);
@@ -1146,7 +1289,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     unawaited(_sendMockLocation(position));
     if (_mapController != null) {
       _setMapProgrammaticMove(true);
-      final update = zoom == null ? CameraUpdate.newLatLng(position) : CameraUpdate.newLatLngZoom(position, zoom);
+      final update = zoom == null
+          ? CameraUpdate.newLatLng(position)
+          : CameraUpdate.newLatLngZoom(position, zoom);
       _mapController!.animateCamera(update);
       return;
     }
@@ -1162,7 +1307,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
         Marker(
           markerId: const MarkerId('current'),
           position: currentPosition,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
           infoWindow: const InfoWindow(title: 'Mocked GPS'),
           zIndexInt: 1,
         ),
@@ -1176,22 +1323,29 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
           draggable: true,
           onDragEnd: (position) {
             context.read<SpooferRouteBloc>().add(
-                  SpooferRouteWaypointUpdatedRequested(index: i, position: position),
-                );
+              SpooferRouteWaypointUpdatedRequested(
+                index: i,
+                position: position,
+              ),
+            );
             context.read<SpooferRouteBloc>().add(
-                  SpooferRouteWaypointSelectedRequested(index: i),
-                );
+              SpooferRouteWaypointSelectedRequested(index: i),
+            );
           },
           onTap: () {
             context.read<SpooferRouteBloc>().add(
-                  SpooferRouteWaypointSelectedRequested(index: i),
-                );
+              SpooferRouteWaypointSelectedRequested(index: i),
+            );
           },
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            i == state.selectedWaypointIndex ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+            i == state.selectedWaypointIndex
+                ? BitmapDescriptor.hueRed
+                : BitmapDescriptor.hueOrange,
           ),
           infoWindow: InfoWindow(
-            title: state.waypointNames.length > i ? state.waypointNames[i] : _defaultWaypointName(i),
+            title: state.waypointNames.length > i
+                ? state.waypointNames[i]
+                : _defaultWaypointName(i),
             snippet: 'Hold and drag to move',
           ),
           zIndexInt: 2,
@@ -1207,7 +1361,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _showUiSnack('Clear the loaded route to edit a custom route.');
       return;
     }
-    context.read<SpooferRouteBloc>().add(SpooferRouteWaypointAddedRequested(position: position));
+    context.read<SpooferRouteBloc>().add(
+      SpooferRouteWaypointAddedRequested(position: position),
+    );
     if (context.read<SpooferRouteBloc>().state.hasPoints) {
       _setProgress(0);
     }
@@ -1215,14 +1371,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _removeCustomPoint(int index) {
-    context.read<SpooferRouteBloc>().add(SpooferRouteWaypointRemovedRequested(index: index));
+    context.read<SpooferRouteBloc>().add(
+      SpooferRouteWaypointRemovedRequested(index: index),
+    );
     if (context.read<SpooferRouteBloc>().state.hasPoints) {
       _setProgress(0);
     }
   }
 
   void _selectCustomPoint(int index) {
-    context.read<SpooferRouteBloc>().add(SpooferRouteWaypointSelectedRequested(index: index));
+    context.read<SpooferRouteBloc>().add(
+      SpooferRouteWaypointSelectedRequested(index: index),
+    );
   }
 
   Future<void> _saveCustomRoute() async {
@@ -1231,7 +1391,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       _showUiSnack('No custom route to save.');
       return;
     }
-    final suggested = 'Custom route ${DateTime.now().toLocal().toString().substring(0, 16)}';
+    final suggested =
+        'Custom route ${DateTime.now().toLocal().toString().substring(0, 16)}';
     final controller = TextEditingController(text: suggested);
     final name = await showDialog<String>(
       context: context,
@@ -1260,14 +1421,18 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     final trimmed = name.isEmpty ? suggested : name;
-    context.read<SpooferRouteBloc>().add(SpooferRouteSavedRouteSaveRequested(name: trimmed));
+    context.read<SpooferRouteBloc>().add(
+      SpooferRouteSavedRouteSaveRequested(name: trimmed),
+    );
   }
 
   Future<bool> _openSavedRoutes() async {
     final bloc = context.read<SpooferRouteBloc>();
     final previousRevision = bloc.state.revision;
     bloc.add(const SpooferRouteSavedRoutesLoadRequested());
-    final loadedState = await bloc.stream.firstWhere((state) => state.revision > previousRevision);
+    final loadedState = await bloc.stream.firstWhere(
+      (state) => state.revision > previousRevision,
+    );
     final routes = List<Map<String, Object?>>.from(loadedState.savedRoutes);
 
     if (routes.isEmpty) {
@@ -1292,7 +1457,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                   title: Text(name),
                   subtitle: Text('${points.length} points'),
                   onTap: () {
-                    context.read<SpooferRouteBloc>().add(SpooferRouteSavedRouteApplyRequested(index: index));
+                    context.read<SpooferRouteBloc>().add(
+                      SpooferRouteSavedRouteApplyRequested(index: index),
+                    );
                     loaded = true;
                     Navigator.of(context).pop();
                   },
@@ -1300,8 +1467,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                     icon: const Icon(Icons.delete),
                     onPressed: () async {
                       context.read<SpooferRouteBloc>().add(
-                            SpooferRouteSavedRouteDeleteRequested(index: index),
-                          );
+                        SpooferRouteSavedRouteDeleteRequested(index: index),
+                      );
                       routes.removeAt(index);
                       setSheetState(() {});
                     },
@@ -1318,8 +1485,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _reorderCustomPoints(int oldIndex, int newIndex) {
     context.read<SpooferRouteBloc>().add(
-          SpooferRouteWaypointsReorderedRequested(oldIndex: oldIndex, newIndex: newIndex),
-        );
+      SpooferRouteWaypointsReorderedRequested(
+        oldIndex: oldIndex,
+        newIndex: newIndex,
+      ),
+    );
     if (context.read<SpooferRouteBloc>().state.hasPoints) {
       _setProgress(0);
     }
@@ -1371,7 +1541,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                 child: const Text('Cancel'),
               ),
               FilledButton(
-                onPressed: canSave ? () => Navigator.of(context).pop(controller.text.trim()) : null,
+                onPressed: canSave
+                    ? () => Navigator.of(context).pop(controller.text.trim())
+                    : null,
                 child: const Text('Save'),
               ),
             ],
@@ -1387,8 +1559,8 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
       return;
     }
     context.read<SpooferRouteBloc>().add(
-          SpooferRouteWaypointRenamedRequested(index: index, name: result),
-        );
+      SpooferRouteWaypointRenamedRequested(index: index, name: result),
+    );
   }
 
   Future<void> _openWaypointList() async {
@@ -1411,7 +1583,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                       child: Row(
                         children: [
-                          Text('Waypoints', style: Theme.of(context).textTheme.titleMedium),
+                          Text(
+                            'Waypoints',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
                           const Spacer(),
                           IconButton(
                             tooltip: 'Save route',
@@ -1433,7 +1608,7 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                         ],
-                        ),
+                      ),
                     ),
                     Expanded(
                       child: hasPoints
@@ -1445,10 +1620,12 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                 setSheetState(() {});
                               },
                               itemBuilder: (context, index) {
-                                final name = routeState.waypointNames.length > index
+                                final name =
+                                    routeState.waypointNames.length > index
                                     ? routeState.waypointNames[index]
                                     : _defaultWaypointName(index);
-                                final position = routeState.waypointPoints[index];
+                                final position =
+                                    routeState.waypointPoints[index];
                                 return ListTile(
                                   key: ValueKey('wp_item_$index'),
                                   dense: true,
@@ -1460,7 +1637,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
                                     radius: 14,
                                     child: Text(
                                       '${index + 1}',
-                                      style: Theme.of(context).textTheme.labelSmall,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.labelSmall,
                                     ),
                                   ),
                                   onTap: () {
@@ -1516,7 +1695,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   }
 
   void _followCamera(LatLng position) {
-    if (_mapController == null || !_mapState.autoFollowEnabled || _userInteracting) {
+    if (_mapController == null ||
+        !_mapState.autoFollowEnabled ||
+        _userInteracting) {
       return;
     }
     _setMapProgrammaticMove(true);
@@ -1535,7 +1716,9 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     _setMapPendingFitRoute(false);
 
     if (routeState.routePoints.length == 1) {
-      _mapController!.moveCamera(CameraUpdate.newLatLngZoom(routeState.routePoints.first, 16));
+      _mapController!.moveCamera(
+        CameraUpdate.newLatLngZoom(routeState.routePoints.first, 16),
+      );
       return;
     }
 
@@ -1546,13 +1729,13 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
   Future<void> _sendMockLocation(LatLng position) async {
     final speedMps = context.read<SpooferPlaybackBloc>().state.speedMps.abs();
     context.read<SpooferMockBloc>().add(
-          SpooferMockApplyLocationRequested(
-            latitude: position.latitude,
-            longitude: position.longitude,
-            accuracy: 3.0,
-            speedMps: speedMps,
-          ),
-        );
+      SpooferMockApplyLocationRequested(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: 3.0,
+        speedMps: speedMps,
+      ),
+    );
   }
 
   LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
@@ -1598,7 +1781,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     final colors = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: TextStyle(color: colors.onInverseSurface)),
+        content: Text(
+          message,
+          style: TextStyle(color: colors.onInverseSurface),
+        ),
         backgroundColor: colors.inverseSurface.withOpacity(0.92),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -1630,7 +1816,10 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
             child: Material(
               color: Colors.transparent,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: colors.inverseSurface.withOpacity(0.92),
                   borderRadius: BorderRadius.circular(12),
@@ -1735,280 +1924,70 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
 
   void _requestStartupChecks({required bool showDialogs}) {
     context.read<SpooferMockBloc>().add(
-          SpooferMockStartupChecksRequested(showDialogs: showDialogs),
-        );
+      SpooferMockStartupChecksRequested(showDialogs: showDialogs),
+    );
   }
 
   void _refreshMockAppStatus() {
-    context.read<SpooferMockBloc>().add(const SpooferMockRefreshStatusRequested());
+    context.read<SpooferMockBloc>().add(
+      const SpooferMockRefreshStatusRequested(),
+    );
+  }
+
+  Future<void> _disableMockLocationAndRecenter() async {
+    _clearMockLocation();
+    await Future.delayed(const Duration(milliseconds: 400));
+    var location = await _getRealLocation();
+    if (location == null) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      location = await _getRealLocation();
+    }
+    if (location == null) {
+      _showUiSnack('Real location not available yet.');
+      return;
+    }
+    _setMapCurrentPosition(location);
+    _setMapLastInjectedPosition(null);
+    _setMapAutoFollow(true);
+    _refreshMarkers();
+    _followCamera(location);
   }
 
   Future<void> _openSettingsSheet() async {
     if (!mounted) {
       return;
     }
-    final initialSettings = _settingsState;
-    var showSetupBar = initialSettings.showSetupBar;
-    var showDebugPanel = initialSettings.showDebugPanel;
-    var showMockMarker = initialSettings.showMockMarker;
-    var backgroundEnabled = initialSettings.backgroundEnabled;
-    var backgroundBusy = initialSettings.backgroundBusy;
-    var darkModeSetting = initialSettings.darkModeSetting;
-    await showGeneralDialog<void>(
+    await showSpooferSettingsSideSheet(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Settings',
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (context, _, __) {
-        return Align(
-          alignment: Alignment.centerRight,
-          child: SafeArea(
-            child: Material(
-              elevation: 6,
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-              child: SizedBox(
-                width: 280,
-                child: StatefulBuilder(
-                  builder: (context, setModalState) {
-                    final denseStyle = Theme.of(context).textTheme.bodySmall;
-                    const compactDensity = VisualDensity(horizontal: -2, vertical: -4);
-                    Widget buildToggle({
-                      required String title,
-                      required bool value,
-                      required ValueChanged<bool> onChanged,
-                    }) {
-                      return ListTile(
-                        dense: true,
-                        visualDensity: compactDensity,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(title, style: denseStyle),
-                        trailing: Transform.scale(
-                          scale: 0.85,
-                          child: Switch(
-                            value: value,
-                            onChanged: onChanged,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                        onTap: () => onChanged(!value),
-                      );
-                    }
-
-                    String darkModeLabel(DarkModeSetting setting) {
-                      switch (setting) {
-                        case DarkModeSetting.on:
-                          return 'On';
-                        case DarkModeSetting.uiOnly:
-                          return 'UI only';
-                        case DarkModeSetting.mapOnly:
-                          return 'Map only';
-                        case DarkModeSetting.off:
-                          return 'Off';
-                      }
-                    }
-                    return ListView(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                      children: [
-                        Row(
-                          children: [
-                            Text('Settings', style: Theme.of(context).textTheme.titleMedium),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () => Navigator.of(context).pop(),
-                              splashRadius: 18,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        buildToggle(
-                          title: 'Show setup bar',
-                          value: showSetupBar,
-                          onChanged: (value) {
-                            setModalState(() {
-                              showSetupBar = value;
-                            });
-                            _settingsBloc.add(
-                              SpooferSettingsShowSetupBarSetRequested(value: value),
-                            );
-                          },
-                        ),
-                        buildToggle(
-                          title: 'Show debug panel',
-                          value: showDebugPanel,
-                          onChanged: (value) {
-                            setModalState(() {
-                              showDebugPanel = value;
-                            });
-                            _settingsBloc.add(
-                              SpooferSettingsShowDebugPanelSetRequested(value: value),
-                            );
-                          },
-                        ),
-                        buildToggle(
-                          title: 'Show mocked marker',
-                          value: showMockMarker,
-                          onChanged: (value) {
-                            setModalState(() {
-                              showMockMarker = value;
-                            });
-                            _settingsBloc.add(
-                              SpooferSettingsShowMockMarkerSetRequested(value: value),
-                            );
-                            _refreshMarkers();
-                          },
-                        ),
-                        ListTile(
-                          dense: true,
-                          visualDensity: compactDensity,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('Background mode', style: denseStyle),
-                          trailing: Transform.scale(
-                            scale: 0.85,
-                            child: Switch(
-                              value: backgroundEnabled,
-                              onChanged: backgroundBusy
-                              ? null
-                              : (value) async {
-                                setModalState(() {
-                                  backgroundEnabled = value;
-                                  backgroundBusy = true;
-                                });
-                                _settingsBloc.add(
-                                  const SpooferSettingsBackgroundBusySetRequested(value: true),
-                                );
-                                final ok = await _setBackgroundMode(value);
-                                setModalState(() {
-                                  backgroundBusy = false;
-                                  backgroundEnabled = _settingsState.backgroundEnabled;
-                                });
-                                _settingsBloc.add(
-                                  const SpooferSettingsBackgroundBusySetRequested(value: false),
-                                );
-                                if (!ok) {
-                                  // snack handled in _setBackgroundMode
-                                }
-                              },
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                          onTap: backgroundBusy
-                          ? null
-                          : () async {
-                            final next = !backgroundEnabled;
-                            setModalState(() {
-                              backgroundEnabled = next;
-                              backgroundBusy = true;
-                            });
-                            _settingsBloc.add(
-                              const SpooferSettingsBackgroundBusySetRequested(value: true),
-                            );
-                            final ok = await _setBackgroundMode(next);
-                            setModalState(() {
-                              backgroundBusy = false;
-                              backgroundEnabled = _settingsState.backgroundEnabled;
-                            });
-                            _settingsBloc.add(
-                              const SpooferSettingsBackgroundBusySetRequested(value: false),
-                            );
-                            if (!ok) {
-                              // snack handled in _setBackgroundMode
-                            }
-                          },
-                        ),
-                        ListTile(
-                          dense: true,
-                          visualDensity: compactDensity,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('Dark mode', style: denseStyle),
-                          trailing: DropdownButtonHideUnderline(
-                            child: DropdownButton<DarkModeSetting>(
-                              isDense: true,
-                              value: darkModeSetting,
-                              items: DarkModeSetting.values
-                              .map(
-                                (setting) => DropdownMenuItem(
-                                  value: setting,
-                                  child: Text(darkModeLabel(setting)),
-                                ),
-                              )
-                              .toList(),
-                              onChanged: (value) {
-                                if (value == null) {
-                                  return;
-                                }
-                                setModalState(() {
-                                  darkModeSetting = value;
-                                });
-                                _applyDarkModeSetting(value);
-                              },
-                            ),
-                          ),
-                        ),
-                        const Divider(height: 16),
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            visualDensity: compactDensity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            textStyle: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          onPressed: () async {
-                            _clearMockLocation();
-                            await Future.delayed(const Duration(milliseconds: 400));
-                            var location = await _getRealLocation();
-                            if (location == null) {
-                              await Future.delayed(const Duration(milliseconds: 600));
-                              location = await _getRealLocation();
-                            }
-                            if (location == null) {
-                              _showUiSnack('Real location not available yet.');
-                              return;
-                            }
-                            _setMapCurrentPosition(location);
-                            _setMapLastInjectedPosition(null);
-                            _setMapAutoFollow(true);
-                            _refreshMarkers();
-                            _followCamera(location);
-                          },
-                          icon: const Icon(Icons.location_off),
-                          label: const Text('Disable mock location'),
-                        ),
-                        const SizedBox(height: 6),
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            visualDensity: compactDensity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            textStyle: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            _requestStartupChecks(showDialogs: true);
-                          },
-                          icon: const Icon(Icons.check_circle_outline),
-                          label: const Text('Run setup checks'),
-                        ),
-                        if (showDebugPanel) ...[
-                          const Divider(height: 16),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _buildDebugPanel(context, context.watch<SpooferMockBloc>().state),
-                          ),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
+      initialSettings: _settingsState,
+      readSettings: () => _settingsState,
+      onShowSetupBarChanged: (value) {
+        _settingsBloc.add(
+          SpooferSettingsShowSetupBarSetRequested(value: value),
         );
       },
-      transitionBuilder: (context, anim, _, child) {
-        final offset = Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(
-          CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
+      onShowDebugPanelChanged: (value) {
+        _settingsBloc.add(
+          SpooferSettingsShowDebugPanelSetRequested(value: value),
         );
-        return SlideTransition(position: offset, child: child);
+      },
+      onShowMockMarkerChanged: (value) {
+        _settingsBloc.add(
+          SpooferSettingsShowMockMarkerSetRequested(value: value),
+        );
+        _refreshMarkers();
+      },
+      onBackgroundModeChanged: (value) async {
+        await _setBackgroundMode(value);
+      },
+      onDarkModeChanged: _applyDarkModeSetting,
+      onDisableMockLocation: _disableMockLocationAndRecenter,
+      onRunSetupChecks: () => _requestStartupChecks(showDialogs: true),
+      debugPanelBuilder: (context) {
+        return _buildDebugPanel(
+          context,
+          context.watch<SpooferMockBloc>().state,
+        );
       },
     );
   }
@@ -2024,7 +2003,11 @@ class _SpooferScreenState extends State<SpooferScreen> with WidgetsBindingObserv
     );
   }
 
-  Future<bool> _confirmDialog(String title, String message, String actionLabel) async {
+  Future<bool> _confirmDialog(
+    String title,
+    String message,
+    String actionLabel,
+  ) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

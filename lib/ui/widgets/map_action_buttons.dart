@@ -35,8 +35,12 @@ class MapActionButtons extends StatelessWidget {
         FloatingActionButton.small(
           heroTag: 'play',
           onPressed: onTogglePlayback,
-          backgroundColor: hasRoute ? null : theme.colorScheme.surfaceVariant,
-          foregroundColor: hasRoute ? null : theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+          backgroundColor: hasRoute
+              ? null
+              : theme.colorScheme.surfaceContainerHighest,
+          foregroundColor: hasRoute
+              ? null
+              : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
           tooltip: isPlaying ? 'Pause' : 'Play',
           child: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
         ),

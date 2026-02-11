@@ -47,7 +47,10 @@ class _SearchScreenState extends State<SearchScreen> {
       _error = null;
     });
     try {
-      final response = await widget.mockController.geocodeAddress(trimmed, maxResults: 8);
+      final response = await widget.mockController.geocodeAddress(
+        trimmed,
+        maxResults: 8,
+      );
       if (!mounted) {
         return;
       }
@@ -122,12 +125,14 @@ class _SearchScreenState extends State<SearchScreen> {
               onPressed: () => _runSearch(_controller.text),
             ),
       onSubmitted: (value) => _runSearch(value),
-      helper: _error == null ? null : Text(_error!, style: Theme.of(context).textTheme.bodySmall),
+      helper: _error == null
+          ? null
+          : Text(_error!, style: Theme.of(context).textTheme.bodySmall),
       body: _results.isEmpty
           ? const Center(child: Text('No results yet.'))
           : ListView.separated(
               itemCount: _results.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final item = _results[index];
                 return ListTile(

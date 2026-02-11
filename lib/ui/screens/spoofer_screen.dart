@@ -844,7 +844,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -920,7 +920,7 @@ class _SpooferScreenState extends State<SpooferScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withOpacity(0.6),
+              color: theme.colorScheme.surface.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(6),
             ),
             constraints: const BoxConstraints(maxHeight: 220),
@@ -1414,7 +1414,7 @@ class _SpooferScreenState extends State<SpooferScreen>
           builder: (context, setSheetState) {
             return ListView.separated(
               itemCount: routes.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (context, index) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final item = routes[index];
                 final name = item['name']?.toString() ?? 'Route';
@@ -1751,7 +1751,7 @@ class _SpooferScreenState extends State<SpooferScreen>
           message,
           style: TextStyle(color: colors.onInverseSurface),
         ),
-        backgroundColor: colors.inverseSurface.withOpacity(0.92),
+        backgroundColor: colors.inverseSurface.withValues(alpha: 0.92),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1787,7 +1787,7 @@ class _SpooferScreenState extends State<SpooferScreen>
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: colors.inverseSurface.withOpacity(0.92),
+                  color: colors.inverseSurface.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: const [
                     BoxShadow(

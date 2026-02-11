@@ -40,7 +40,7 @@ Future<void> showSpooferSettingsSideSheet({
         debugPanelBuilder: debugPanelBuilder,
       );
     },
-    transitionBuilder: (context, anim, _, child) {
+    transitionBuilder: (context, anim, secondaryAnimation, child) {
       final offset = Tween<Offset>(
         begin: const Offset(1, 0),
         end: Offset.zero,

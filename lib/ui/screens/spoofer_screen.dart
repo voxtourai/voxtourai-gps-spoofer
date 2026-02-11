@@ -40,6 +40,7 @@ import '../widgets/controls_panel.dart';
 import '../widgets/map_action_buttons.dart';
 import '../widgets/route_input_dialog.dart';
 import '../widgets/settings_side_sheet.dart';
+import '../widgets/spoofer_app_bar.dart';
 import '../widgets/waypoint_action_row.dart';
 import 'help_screen.dart';
 import 'search_screen.dart';
@@ -289,30 +290,11 @@ class _SpooferScreenState extends State<SpooferScreen>
                   return BlocBuilder<SpooferSettingsBloc, SpooferSettingsState>(
                     builder: (context, settingsState) {
                       return Scaffold(
-                        appBar: AppBar(
-                          toolbarHeight: 48,
-                          title: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: _handleTitleTap,
-                            child: const Text('GPS Spoofer'),
-                          ),
-                          actions: [
-                            IconButton(
-                              tooltip: 'Search',
-                              icon: const Icon(Icons.search),
-                              onPressed: _openSearchScreen,
-                            ),
-                            IconButton(
-                              tooltip: 'Help',
-                              icon: const Icon(Icons.help_outline),
-                              onPressed: _openHelpScreen,
-                            ),
-                            IconButton(
-                              tooltip: 'Settings',
-                              icon: const Icon(Icons.settings),
-                              onPressed: _openSettingsSheet,
-                            ),
-                          ],
+                        appBar: SpooferAppBar(
+                          onTitleTap: _handleTitleTap,
+                          onSearchTap: _openSearchScreen,
+                          onHelpTap: _openHelpScreen,
+                          onSettingsTap: _openSettingsSheet,
                         ),
                         body: Column(
                           children: [

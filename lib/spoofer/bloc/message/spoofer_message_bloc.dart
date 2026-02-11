@@ -30,6 +30,6 @@ class SpooferMessageBloc extends Bloc<SpooferMessageEvent, SpooferMessageState> 
     SpooferMessageClearedRequested event,
     Emitter<SpooferMessageState> emit,
   ) {
-    emit(state.copyWith(clearMessage: true));
+    emit(state.copyWith(message: null));
   }
 }

@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+
+part 'spoofer_message_state.g.dart';
 
 enum SpooferMessageType { snack, overlay }
 
@@ -16,17 +19,9 @@ class SpooferMessage {
 }
 
 @immutable
+@CopyWith()
 class SpooferMessageState {
   const SpooferMessageState({this.message});
 
   final SpooferMessage? message;
-
-  SpooferMessageState copyWith({
-    SpooferMessage? message,
-    bool clearMessage = false,
-  }) {
-    return SpooferMessageState(
-      message: clearMessage ? null : (message ?? this.message),
-    );
-  }
 }

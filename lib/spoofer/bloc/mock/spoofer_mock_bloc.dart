@@ -72,7 +72,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     emit(
       state.copyWith(
         startupChecksRunning: true,
-        clearPrompt: true,
+        prompt: null,
       ),
     );
 
@@ -144,7 +144,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
       return;
     }
 
-    emit(state.copyWith(clearPrompt: true));
+    emit(state.copyWith(prompt: null));
 
     if (!event.accepted) {
       return;
@@ -174,7 +174,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
       final isSelected = await _safeBool(_mockController.isMockLocationApp);
       emit(
         state.copyWith(
-          selectedMockApp: selected,
+          selectedMockApp: selected ?? state.selectedMockApp,
           isMockLocationApp: isSelected,
         ),
       );
@@ -200,7 +200,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
         accuracy: event.accuracy,
         speedMps: event.speedMps,
       );
-      emit(state.copyWith(lastMockStatus: result));
+      emit(state.copyWith(lastMockStatus: result ?? state.lastMockStatus));
 
       final gpsApplied = result?['gpsApplied'] == true;
       final mockAppSelected = result?['mockAppSelected'] == true;
@@ -237,8 +237,8 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
       final result = await _mockController.clearMockLocation();
       emit(
         state.copyWith(
-          lastMockStatus: result,
-          clearMockError: true,
+          lastMockStatus: result ?? state.lastMockStatus,
+          mockError: null,
         ),
       );
       add(const SpooferMockDebugLogAppended(message: 'Cleared mock location.'));
@@ -259,7 +259,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     if (state.hasLocationPermission == event.value) {
       return;
     }
-    emit(state.copyWith(hasLocationPermission: event.value));
+    emit(state.copyWith(hasLocationPermission: event.value ?? state.hasLocationPermission));
   }
 
   void _onDeveloperModeSetRequested(
@@ -269,7 +269,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     if (state.isDeveloperModeEnabled == event.value) {
       return;
     }
-    emit(state.copyWith(isDeveloperModeEnabled: event.value));
+    emit(state.copyWith(isDeveloperModeEnabled: event.value ?? state.isDeveloperModeEnabled));
   }
 
   void _onMockLocationAppSetRequested(
@@ -279,7 +279,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     if (state.isMockLocationApp == event.value) {
       return;
     }
-    emit(state.copyWith(isMockLocationApp: event.value));
+    emit(state.copyWith(isMockLocationApp: event.value ?? state.isMockLocationApp));
   }
 
   void _onSelectedAppSetRequested(
@@ -289,14 +289,14 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     if (state.selectedMockApp == event.value) {
       return;
     }
-    emit(state.copyWith(selectedMockApp: event.value));
+    emit(state.copyWith(selectedMockApp: event.value ?? state.selectedMockApp));
   }
 
   void _onStatusSetRequested(
     SpooferMockStatusSetRequested event,
     Emitter<SpooferMockState> emit,
   ) {
-    emit(state.copyWith(lastMockStatus: event.value));
+    emit(state.copyWith(lastMockStatus: event.value ?? state.lastMockStatus));
   }
 
   void _onErrorSetRequested(
@@ -323,7 +323,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     if (state.mockError == null) {
       return;
     }
-    emit(state.copyWith(clearMockError: true));
+    emit(state.copyWith(mockError: null));
   }
 
   void _onDebugLogAppended(

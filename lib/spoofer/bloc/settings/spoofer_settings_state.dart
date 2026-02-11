@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+
+part 'spoofer_settings_state.g.dart';
 
 enum DarkModeSetting { on, uiOnly, mapOnly, off }
 
 @immutable
+@CopyWith()
 class SpooferSettingsState {
   const SpooferSettingsState({
     this.showMockMarker = false,
@@ -21,25 +25,4 @@ class SpooferSettingsState {
   final bool backgroundBusy;
   final bool backgroundNotificationShown;
   final DarkModeSetting darkModeSetting;
-
-  SpooferSettingsState copyWith({
-    bool? showMockMarker,
-    bool? showSetupBar,
-    bool? showDebugPanel,
-    bool? backgroundEnabled,
-    bool? backgroundBusy,
-    bool? backgroundNotificationShown,
-    DarkModeSetting? darkModeSetting,
-  }) {
-    return SpooferSettingsState(
-      showMockMarker: showMockMarker ?? this.showMockMarker,
-      showSetupBar: showSetupBar ?? this.showSetupBar,
-      showDebugPanel: showDebugPanel ?? this.showDebugPanel,
-      backgroundEnabled: backgroundEnabled ?? this.backgroundEnabled,
-      backgroundBusy: backgroundBusy ?? this.backgroundBusy,
-      backgroundNotificationShown:
-          backgroundNotificationShown ?? this.backgroundNotificationShown,
-      darkModeSetting: darkModeSetting ?? this.darkModeSetting,
-    );
-  }
 }

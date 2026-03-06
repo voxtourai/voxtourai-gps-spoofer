@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Flutter Analyze" type="FlutterCommandRunConfigurationType" factoryName="Flutter Command">
-    <option name="filePath" value="$PROJECT_DIR$" />
-    <option name="additionalArgs" value="analyze" />
+  <configuration default="false" name="Flutter Analyze" type="DartCommandLineRunConfigurationType" factoryName="Dart Command Line Application">
+    <option name="filePath" value="$PROJECT_DIR$/scripts/flutter_analyze.dart" />
+    <option name="workingDirectory" value="$PROJECT_DIR$" />
     <method v="2" />
   </configuration>
 </component>

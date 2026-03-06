@@ -67,6 +67,9 @@ Release builds are currently signed with the debug signing config; replace that 
 
 The app is split into `bloc/`, `domain/`, and `infrastructure/` layers:
 
+For a meeting-ready walkthrough of the ownership model, runtime flow, and
+verification story, see `docs/architecture-walkthrough.md`.
+
 - `SpooferRouteBloc`
   - Owns route parsing, route progress, waypoint CRUD/reorder/rename, and saved custom routes.
   - Key events: load/clear/progress set, waypoint add/update/remove/select/rename/reorder, saved route load/save/delete/apply.

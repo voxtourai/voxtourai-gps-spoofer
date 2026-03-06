@@ -14,6 +14,33 @@ val localProperties = Properties().apply {
     }
 }
 
+val keystoreProperties = Properties().apply {
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.inputStream().use { load(it) }
+    }
+}
+
+fun signingProperty(name: String, envName: String): String? {
+    val fromGradle = project.findProperty(name) as String?
+    val fromKeystoreFile = keystoreProperties.getProperty(name)
+    val fromEnv = System.getenv(envName)
+    return fromGradle?.takeIf { it.isNotBlank() }
+        ?: fromKeystoreFile?.takeIf { it.isNotBlank() }
+        ?: fromEnv?.takeIf { it.isNotBlank() }
+}
+
+val releaseStoreFile = signingProperty("storeFile", "ANDROID_KEYSTORE_FILE")
+val releaseStorePassword =
+    signingProperty("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+val releaseKeyAlias = signingProperty("keyAlias", "ANDROID_KEY_ALIAS")
+val releaseKeyPassword =
+    signingProperty("keyPassword", "ANDROID_KEY_PASSWORD") ?: releaseStorePassword
+val hasReleaseSigning =
+    !releaseStoreFile.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank()
+
 android {
     namespace = "ai.voxtour.voxtourai_gps_spoofer"
     compileSdk = flutter.compileSdkVersion
@@ -27,6 +54,19 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
     }
 
     defaultConfig {
@@ -47,9 +87,12 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Keep local release builds working, but this output is not Play-uploadable.
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 }

@@ -50,7 +50,15 @@ flutter build appbundle --release
 
 Build commands use the same `MAPS_API_KEY` sources as local runs.
 
-Release builds are currently signed with the debug signing config; replace that before uploading to Google Play.
+For Play-ready signing, configure `android/keystore.properties` from
+`android/keystore.properties.example`, or set the `ANDROID_KEYSTORE_*`
+environment variables before building.
+
+If no release signing values are configured, release builds fall back to debug
+signing for local smoke use only and are not uploadable to Google Play.
+
+For the full repo-side release checklist, see
+`docs/android-open-testing-checklist.md`.
 
 ## Usage
 - Tap **Load** to paste a route; **Clear** removes it.

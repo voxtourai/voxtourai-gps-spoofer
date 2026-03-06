@@ -1,19 +1,20 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voxtourai_gps_spoofer/controllers/mock_location_controller.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/mock/spoofer_mock_bloc.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/mock/spoofer_mock_event.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/mock/spoofer_mock_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/mock/spoofer_mock_bloc.dart';
+import 'package:voxtourai_gps_spoofer/bloc/mock/spoofer_mock_event.dart';
+import 'package:voxtourai_gps_spoofer/bloc/mock/spoofer_mock_state.dart';
+import 'package:voxtourai_gps_spoofer/infrastructure/mock_location_gateway.dart';
 
 void main() {
   group('SpooferMockBloc', () {
     blocTest<SpooferMockBloc, SpooferMockState>(
       'startup checks prompt app settings when location permission is denied',
       build: () => SpooferMockBloc(
-        mockController: _FakeMockLocationController(),
+        mockGateway: _FakeMockLocationGateway(),
         requestLocationPermission: () async => false,
       ),
-      act: (bloc) => bloc.add(const SpooferMockStartupChecksRequested(showDialogs: true)),
+      act: (bloc) =>
+          bloc.add(const SpooferMockStartupChecksRequested(showDialogs: true)),
       wait: const Duration(milliseconds: 20),
       verify: (bloc) {
         expect(bloc.state.startupChecksRunning, false);
@@ -26,7 +27,7 @@ void main() {
     blocTest<SpooferMockBloc, SpooferMockState>(
       'prompt resolution invokes app settings action',
       build: () => SpooferMockBloc(
-        mockController: _FakeMockLocationController(),
+        mockGateway: _FakeMockLocationGateway(),
         requestLocationPermission: () async => false,
         openAppSettingsAction: () async {
           openedAppSettings = true;
@@ -38,7 +39,9 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 30));
         final promptId = bloc.state.prompt?.id;
         expect(promptId, isNotNull);
-        bloc.add(SpooferMockPromptResolved(promptId: promptId!, accepted: true));
+        bloc.add(
+          SpooferMockPromptResolved(promptId: promptId!, accepted: true),
+        );
       },
       wait: const Duration(milliseconds: 30),
       verify: (bloc) {
@@ -50,7 +53,7 @@ void main() {
     blocTest<SpooferMockBloc, SpooferMockState>(
       'apply location reports gps not applied error',
       build: () => SpooferMockBloc(
-        mockController: _FakeMockLocationController(
+        mockGateway: _FakeMockLocationGateway(
           applyResult: <String, Object?>{
             'gpsApplied': false,
             'mockAppSelected': true,
@@ -76,7 +79,7 @@ void main() {
     blocTest<SpooferMockBloc, SpooferMockState>(
       'refresh status updates selected package and selection state',
       build: () => SpooferMockBloc(
-        mockController: _FakeMockLocationController(
+        mockGateway: _FakeMockLocationGateway(
           selectedMockApp: 'ai.voxtour.voxtourai_gps_spoofer',
           isMockApp: true,
         ),
@@ -91,8 +94,8 @@ void main() {
   });
 }
 
-class _FakeMockLocationController extends MockLocationController {
-  _FakeMockLocationController({
+class _FakeMockLocationGateway extends MockLocationGateway {
+  _FakeMockLocationGateway({
     this.applyResult,
     this.isMockApp = true,
     this.selectedMockApp,
@@ -109,7 +112,8 @@ class _FakeMockLocationController extends MockLocationController {
     required double accuracy,
     required double speedMps,
   }) async {
-    return applyResult ?? <String, Object?>{'gpsApplied': true, 'mockAppSelected': true};
+    return applyResult ??
+        <String, Object?>{'gpsApplied': true, 'mockAppSelected': true};
   }
 
   @override

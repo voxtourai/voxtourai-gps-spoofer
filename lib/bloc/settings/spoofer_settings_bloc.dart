@@ -6,9 +6,13 @@ import 'spoofer_settings_state.dart';
 class SpooferSettingsBloc
     extends Bloc<SpooferSettingsEvent, SpooferSettingsState> {
   SpooferSettingsBloc() : super(const SpooferSettingsState()) {
-    on<SpooferSettingsShowMockMarkerSetRequested>(_onShowMockMarkerSetRequested);
+    on<SpooferSettingsShowMockMarkerSetRequested>(
+      _onShowMockMarkerSetRequested,
+    );
     on<SpooferSettingsShowSetupBarSetRequested>(_onShowSetupBarSetRequested);
-    on<SpooferSettingsShowDebugPanelSetRequested>(_onShowDebugPanelSetRequested);
+    on<SpooferSettingsShowDebugPanelSetRequested>(
+      _onShowDebugPanelSetRequested,
+    );
     on<SpooferSettingsBackgroundEnabledSetRequested>(
       _onBackgroundEnabledSetRequested,
     );

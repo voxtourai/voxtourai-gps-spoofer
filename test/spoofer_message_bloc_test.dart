@@ -1,8 +1,8 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/message/spoofer_message_bloc.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/message/spoofer_message_event.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/message/spoofer_message_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/message/spoofer_message_bloc.dart';
+import 'package:voxtourai_gps_spoofer/bloc/message/spoofer_message_event.dart';
+import 'package:voxtourai_gps_spoofer/bloc/message/spoofer_message_state.dart';
 
 void main() {
   group('SpooferMessageBloc', () {

@@ -63,9 +63,9 @@ Release builds are currently signed with the debug signing config; replace that 
 - Requires Android Developer Options with this app selected as mock location app.
 - Device geocoding search quality depends on OS/geocoder availability.
 
-## Architecture (BLoC)
+## Architecture
 
-The app uses feature BLoCs plus a small runtime coordinator:
+The app is split into `bloc/`, `domain/`, and `infrastructure/` layers:
 
 - `SpooferRouteBloc`
   - Owns route parsing, route progress, waypoint CRUD/reorder/rename, and saved custom routes.
@@ -97,14 +97,14 @@ The app uses feature BLoCs plus a small runtime coordinator:
   - Key events: show message (`snack`/`overlay`) and clear message.
   - Key state: `message` with monotonic `id` and `type`.
 
-- `SpooferRuntimeCoordinator`
-  - Coordinates cross-BLoC runtime math for playback ticks and route interpolation:
+- `RoutePlaybackMath`
+  - Pure route/playback math used by the route BLoC and screen runtime:
     - playback tick -> next route progress (+ boundary handling)
     - route progress -> map position interpolation
 
 - Infrastructure adapters (non-BLoC):
-  - `MockLocationController`: Android platform channel bridge for mock location operations.
-  - `PreferencesController`: persistence for TOS and saved custom routes.
+  - `MockLocationGateway`: Android platform channel bridge for mock location operations.
+  - `PreferencesStore`: persistence for TOS and saved custom routes.
 
 ## Testing
 
@@ -113,7 +113,7 @@ The app uses feature BLoCs plus a small runtime coordinator:
   - `test/spoofer_playback_bloc_test.dart`
   - `test/spoofer_mock_bloc_test.dart`
   - `test/spoofer_map_bloc_test.dart`
-  - `test/spoofer_runtime_coordinator_test.dart`
+  - `test/route_playback_math_test.dart`
 - Integration smoke:
   - `integration_test/app_smoke_test.dart`
 

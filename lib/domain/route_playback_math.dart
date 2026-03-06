@@ -5,11 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../bloc/playback/spoofer_playback_state.dart';
 import '../bloc/route/spoofer_route_state.dart';
 
-enum PlaybackBoundary {
-  none,
-  start,
-  end,
-}
+enum PlaybackBoundary { none, start, end }
 
 class PlaybackTickResolution {
   const PlaybackTickResolution({
@@ -21,8 +17,8 @@ class PlaybackTickResolution {
   final PlaybackBoundary boundary;
 }
 
-class SpooferRuntimeCoordinator {
-  const SpooferRuntimeCoordinator();
+class RoutePlaybackMath {
+  const RoutePlaybackMath();
 
   PlaybackTickResolution? resolvePlaybackTick({
     required SpooferRouteState routeState,
@@ -33,7 +29,8 @@ class SpooferRuntimeCoordinator {
       return null;
     }
 
-    final nextDistance = routeState.progressDistance + playbackState.speedMps * deltaSeconds;
+    final nextDistance =
+        routeState.progressDistance + playbackState.speedMps * deltaSeconds;
     if (nextDistance >= routeState.totalDistanceMeters) {
       return const PlaybackTickResolution(
         progress: 1.0,
@@ -53,16 +50,31 @@ class SpooferRuntimeCoordinator {
     );
   }
 
-  LatLng? positionForProgress(SpooferRouteState routeState, double progress) {
-    final points = routeState.routePoints;
+  double totalDistanceMeters(List<LatLng> points) {
+    if (points.length < 2) {
+      return 0;
+    }
+
+    var total = 0.0;
+    for (var i = 1; i < points.length; i++) {
+      total += _distanceMeters(points[i - 1], points[i]);
+    }
+    return total;
+  }
+
+  LatLng? positionForProgress({
+    required List<LatLng> points,
+    required double totalDistanceMeters,
+    required double progress,
+  }) {
     if (points.isEmpty) {
       return null;
     }
-    if (points.length == 1 || routeState.totalDistanceMeters <= 0) {
+    if (points.length == 1 || totalDistanceMeters <= 0) {
       return points.first;
     }
 
-    final targetMeters = routeState.totalDistanceMeters * _clamp01(progress);
+    final targetMeters = totalDistanceMeters * _clamp01(progress);
 
     var cumulative = 0.0;
     for (var i = 1; i < points.length; i++) {
@@ -93,7 +105,8 @@ class SpooferRuntimeCoordinator {
 
     final sinDLat = math.sin(dLat / 2);
     final sinDLng = math.sin(dLng / 2);
-    final aa = sinDLat * sinDLat + math.cos(lat1) * math.cos(lat2) * sinDLng * sinDLng;
+    final aa =
+        sinDLat * sinDLat + math.cos(lat1) * math.cos(lat2) * sinDLng * sinDLng;
     final c = 2 * math.atan2(math.sqrt(aa), math.sqrt(1 - aa));
     return earthRadius * c;
   }

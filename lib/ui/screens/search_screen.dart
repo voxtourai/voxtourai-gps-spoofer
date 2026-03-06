@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../controllers/mock_location_controller.dart';
+import '../../infrastructure/mock_location_gateway.dart';
 import '../widgets/search_scaffold.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
     super.key,
-    required this.mockController,
+    required this.mockGateway,
     required this.onSelect,
     required this.onLog,
   });
 
-  final MockLocationController mockController;
+  final MockLocationGateway mockGateway;
   final void Function(LatLng location, double zoom) onSelect;
   final void Function(String message) onLog;
 
@@ -47,7 +47,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _error = null;
     });
     try {
-      final response = await widget.mockController.geocodeAddress(
+      final response = await widget.mockGateway.geocodeAddress(
         trimmed,
         maxResults: 8,
       );

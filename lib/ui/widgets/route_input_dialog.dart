@@ -44,13 +44,17 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
   void _onTextChanged() {
     final trimmed = _controller.text.trim();
     setState(() {
-      _detectedPolyline = trimmed.isEmpty ? null : widget.detectPolyline(trimmed);
+      _detectedPolyline = trimmed.isEmpty
+          ? null
+          : widget.detectPolyline(trimmed);
     });
   }
 
   void _fillDemo() {
     _controller.text = widget.sampleRoute;
-    _controller.selection = TextSelection.collapsed(offset: _controller.text.length);
+    _controller.selection = TextSelection.collapsed(
+      offset: _controller.text.length,
+    );
     widget.onDemoFilled?.call();
   }
 
@@ -86,7 +90,9 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Input required to load a route.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ),
           ] else if (_detectedPolyline != null) ...[
@@ -95,7 +101,9 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Polyline detected.',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
               ),
             ),
           ],
@@ -111,12 +119,11 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        TextButton(
-          onPressed: _fillDemo,
-          child: const Text('Demo'),
-        ),
+        TextButton(onPressed: _fillDemo, child: const Text('Demo')),
         FilledButton(
-          onPressed: _isEmpty ? null : () => Navigator.of(context).pop(_controller.text),
+          onPressed: _isEmpty
+              ? null
+              : () => Navigator.of(context).pop(_controller.text),
           child: const Text('Load'),
         ),
       ],

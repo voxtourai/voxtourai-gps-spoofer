@@ -3,6 +3,7 @@
 This document is the chunk 1 output for the GPS spoofer refactor plan.
 It defines the current ownership model, the structural problems to fix, the
 target layout, and the behavior that must remain unchanged during chunk 2.
+References to the old paths and class names below are historical on purpose.
 
 ## Scope
 
@@ -352,4 +353,3 @@ Chunk 2 should implement the folder flattening and renames first:
 4. remove duplicated interpolation math from either the bloc or the helper so
    one implementation remains
 5. run `flutter analyze` and `flutter test`
-

@@ -55,10 +55,7 @@ class _HelpScreenState extends State<HelpScreen> {
                   title: Text(section.title),
                   childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(body),
-                    ),
+                    Align(alignment: Alignment.centerLeft, child: Text(body)),
                   ],
                 );
               },

@@ -25,7 +25,8 @@ class SpooferSettingsShowDebugPanelSetRequested extends SpooferSettingsEvent {
   final bool value;
 }
 
-class SpooferSettingsBackgroundEnabledSetRequested extends SpooferSettingsEvent {
+class SpooferSettingsBackgroundEnabledSetRequested
+    extends SpooferSettingsEvent {
   const SpooferSettingsBackgroundEnabledSetRequested({required this.value});
 
   final bool value;

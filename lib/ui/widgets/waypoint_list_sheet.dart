@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../spoofer/bloc/route/spoofer_route_bloc.dart';
-import '../../spoofer/bloc/route/spoofer_route_state.dart';
+import '../../bloc/route/spoofer_route_bloc.dart';
+import '../../bloc/route/spoofer_route_state.dart';
 
 typedef WaypointLoadRoute = Future<bool> Function();
 typedef WaypointRename = Future<void> Function(int index);

@@ -1,13 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/playback/spoofer_playback_state.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/route/spoofer_route_state.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/coordinator/spoofer_runtime_coordinator.dart';
+import 'package:voxtourai_gps_spoofer/bloc/playback/spoofer_playback_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_state.dart';
+import 'package:voxtourai_gps_spoofer/domain/route_playback_math.dart';
 
 void main() {
-  const coordinator = SpooferRuntimeCoordinator();
+  const routePlaybackMath = RoutePlaybackMath();
 
-  group('SpooferRuntimeCoordinator', () {
+  group('RoutePlaybackMath', () {
     test('returns null for tick resolution when route is unavailable', () {
       const route = SpooferRouteState();
       const playback = SpooferPlaybackState(
@@ -15,7 +15,7 @@ void main() {
         tickDeltaSeconds: 0.1,
       );
 
-      final result = coordinator.resolvePlaybackTick(
+      final result = routePlaybackMath.resolvePlaybackTick(
         routeState: route,
         playbackState: playback,
       );
@@ -38,7 +38,7 @@ void main() {
         tickDeltaSeconds: 0.1,
       );
 
-      final result = coordinator.resolvePlaybackTick(
+      final result = routePlaybackMath.resolvePlaybackTick(
         routeState: route,
         playbackState: playback,
       );
@@ -50,14 +50,15 @@ void main() {
 
     test('interpolates map position for partial progress', () {
       const route = SpooferRouteState(
-        routePoints: <LatLng>[
-          LatLng(0.0, 0.0),
-          LatLng(0.0, 1.0),
-        ],
+        routePoints: <LatLng>[LatLng(0.0, 0.0), LatLng(0.0, 1.0)],
         totalDistanceMeters: 1000,
       );
 
-      final position = coordinator.positionForProgress(route, 0.5);
+      final position = routePlaybackMath.positionForProgress(
+        points: route.routePoints,
+        totalDistanceMeters: route.totalDistanceMeters,
+        progress: 0.5,
+      );
 
       expect(position, isNotNull);
       expect(position!.latitude, closeTo(0.0, 0.000001));

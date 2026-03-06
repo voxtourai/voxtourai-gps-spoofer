@@ -1,9 +1,9 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/map/spoofer_map_bloc.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/map/spoofer_map_event.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/map/spoofer_map_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/map/spoofer_map_bloc.dart';
+import 'package:voxtourai_gps_spoofer/bloc/map/spoofer_map_event.dart';
+import 'package:voxtourai_gps_spoofer/bloc/map/spoofer_map_state.dart';
 
 void main() {
   group('SpooferMapBloc', () {
@@ -18,7 +18,10 @@ void main() {
       ),
       verify: (bloc) {
         expect(bloc.state.currentPosition, const LatLng(43.6532, -79.3832));
-        expect(bloc.state.lastInjectedPosition, const LatLng(43.6532, -79.3832));
+        expect(
+          bloc.state.lastInjectedPosition,
+          const LatLng(43.6532, -79.3832),
+        );
       },
     );
 
@@ -57,10 +60,7 @@ void main() {
               polylines: <Polyline>{
                 const Polyline(
                   polylineId: PolylineId('route'),
-                  points: <LatLng>[
-                    LatLng(40.0, -73.0),
-                    LatLng(40.1, -73.1),
-                  ],
+                  points: <LatLng>[LatLng(40.0, -73.0), LatLng(40.1, -73.1)],
                 ),
               },
             ),

@@ -1,8 +1,8 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/settings/spoofer_settings_bloc.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/settings/spoofer_settings_event.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/settings/spoofer_settings_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/settings/spoofer_settings_bloc.dart';
+import 'package:voxtourai_gps_spoofer/bloc/settings/spoofer_settings_event.dart';
+import 'package:voxtourai_gps_spoofer/bloc/settings/spoofer_settings_state.dart';
 
 void main() {
   group('SpooferSettingsBloc', () {
@@ -21,7 +21,11 @@ void main() {
               value: true,
             ),
           )
-          ..add(const SpooferSettingsDarkModeSetRequested(value: DarkModeSetting.mapOnly));
+          ..add(
+            const SpooferSettingsDarkModeSetRequested(
+              value: DarkModeSetting.mapOnly,
+            ),
+          );
       },
       verify: (bloc) {
         expect(bloc.state.showSetupBar, true);

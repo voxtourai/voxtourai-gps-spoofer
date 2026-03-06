@@ -5,11 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'spoofer_playback_event.dart';
 import 'spoofer_playback_state.dart';
 
-class SpooferPlaybackBloc extends Bloc<SpooferPlaybackEvent, SpooferPlaybackState> {
+class SpooferPlaybackBloc
+    extends Bloc<SpooferPlaybackEvent, SpooferPlaybackState> {
   SpooferPlaybackBloc({
     Duration tickInterval = const Duration(milliseconds: 50),
-  })  : _tickInterval = tickInterval,
-        super(const SpooferPlaybackState()) {
+  }) : _tickInterval = tickInterval,
+       super(const SpooferPlaybackState()) {
     on<SpooferPlaybackInitialized>(_onInitialized);
     on<SpooferPlaybackPlayRequested>(_onPlayRequested);
     on<SpooferPlaybackPauseRequested>(_onPauseRequested);
@@ -66,12 +67,7 @@ class SpooferPlaybackBloc extends Bloc<SpooferPlaybackEvent, SpooferPlaybackStat
       return;
     }
     _stopTimer();
-    emit(
-      state.copyWith(
-        isPlaying: false,
-        tickDeltaSeconds: null,
-      ),
-    );
+    emit(state.copyWith(isPlaying: false, tickDeltaSeconds: null));
   }
 
   void _onSpeedSetRequested(

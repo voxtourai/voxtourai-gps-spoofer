@@ -6,10 +6,7 @@ part 'spoofer_route_state.g.dart';
 
 @immutable
 class SpooferRouteStateMessage {
-  const SpooferRouteStateMessage({
-    required this.id,
-    required this.text,
-  });
+  const SpooferRouteStateMessage({required this.id, required this.text});
 
   final int id;
   final String text;

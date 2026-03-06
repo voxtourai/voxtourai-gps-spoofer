@@ -67,7 +67,10 @@ class ControlsPanel extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Speed', style: Theme.of(context).textTheme.labelMedium),
+                    Text(
+                      'Speed',
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
                     Text(
                       '${speedMps.toStringAsFixed(0)} m/s',
                       style: Theme.of(context).textTheme.labelMedium,
@@ -90,7 +93,9 @@ class ControlsPanel extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   mockError!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.redAccent),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.redAccent),
                 ),
               ),
             const SizedBox(height: 8),

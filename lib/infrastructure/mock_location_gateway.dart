@@ -1,10 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class MockLocationController {
-  const MockLocationController();
+class MockLocationGateway {
+  const MockLocationGateway();
 
-  static const MethodChannel _channel = MethodChannel('voxtourai_gps_spoofer/mock_location');
+  static const MethodChannel _channel = MethodChannel(
+    'voxtourai_gps_spoofer/mock_location',
+  );
 
   Future<Map<String, Object?>?> setMockLocation({
     required double latitude,
@@ -12,32 +14,41 @@ class MockLocationController {
     required double accuracy,
     required double speedMps,
   }) async {
-    final result = await _channel.invokeMethod<Map<Object?, Object?>>('setMockLocation', {
-      'latitude': latitude,
-      'longitude': longitude,
-      'accuracy': accuracy,
-      'speedMps': speedMps,
-    });
+    final result = await _channel
+        .invokeMethod<Map<Object?, Object?>>('setMockLocation', {
+          'latitude': latitude,
+          'longitude': longitude,
+          'accuracy': accuracy,
+          'speedMps': speedMps,
+        });
     return _stringify(result);
   }
 
   Future<Map<String, Object?>?> clearMockLocation() async {
-    final result = await _channel.invokeMethod<Map<Object?, Object?>>('clearMockLocation');
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'clearMockLocation',
+    );
     return _stringify(result);
   }
 
   Future<LatLng?> getCurrentLocation() async {
-    final result = await _channel.invokeMethod<Map<Object?, Object?>>('getCurrentLocation');
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'getCurrentLocation',
+    );
     return _locationFromResult(result);
   }
 
   Future<LatLng?> getLastKnownLocation() async {
-    final result = await _channel.invokeMethod<Map<Object?, Object?>>('getLastKnownLocation');
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'getLastKnownLocation',
+    );
     return _locationFromResult(result);
   }
 
   Future<Map<String, Object?>?> getMockDebug() async {
-    final result = await _channel.invokeMethod<Map<Object?, Object?>>('getMockDebug');
+    final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+      'getMockDebug',
+    );
     return _stringify(result);
   }
 
@@ -59,11 +70,14 @@ class MockLocationController {
     await _channel.invokeMethod('openDeveloperSettings');
   }
 
-  Future<List<Map<String, Object?>>> geocodeAddress(String query, {int maxResults = 8}) async {
-    final response = await _channel.invokeMethod<List<dynamic>>('geocodeAddress', {
-      'query': query,
-      'maxResults': maxResults,
-    });
+  Future<List<Map<String, Object?>>> geocodeAddress(
+    String query, {
+    int maxResults = 8,
+  }) async {
+    final response = await _channel.invokeMethod<List<dynamic>>(
+      'geocodeAddress',
+      {'query': query, 'maxResults': maxResults},
+    );
     final results = <Map<String, Object?>>[];
     for (final entry in response ?? []) {
       if (entry is Map) {
@@ -93,4 +107,4 @@ class MockLocationController {
   }
 }
 
-const MockLocationController mockLocationController = MockLocationController();
+const MockLocationGateway mockLocationGateway = MockLocationGateway();

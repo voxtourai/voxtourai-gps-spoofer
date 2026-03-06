@@ -8,7 +8,9 @@ class SpooferMapBloc extends Bloc<SpooferMapEvent, SpooferMapState> {
   SpooferMapBloc() : super(const SpooferMapState()) {
     on<SpooferMapInitialized>(_onInitialized);
     on<SpooferMapCurrentPositionSetRequested>(_onCurrentPositionSetRequested);
-    on<SpooferMapLastInjectedPositionSetRequested>(_onLastInjectedPositionSetRequested);
+    on<SpooferMapLastInjectedPositionSetRequested>(
+      _onLastInjectedPositionSetRequested,
+    );
     on<SpooferMapPolylinesSetRequested>(_onPolylinesSetRequested);
     on<SpooferMapMarkersSetRequested>(_onMarkersSetRequested);
     on<SpooferMapAutoFollowSetRequested>(_onAutoFollowSetRequested);
@@ -31,7 +33,8 @@ class SpooferMapBloc extends Bloc<SpooferMapEvent, SpooferMapState> {
     Emitter<SpooferMapState> emit,
   ) {
     if (state.currentPosition == event.position &&
-        (!event.updateLastInjected || state.lastInjectedPosition == event.position)) {
+        (!event.updateLastInjected ||
+            state.lastInjectedPosition == event.position)) {
       return;
     }
     emit(

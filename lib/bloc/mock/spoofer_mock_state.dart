@@ -5,10 +5,7 @@ part 'spoofer_mock_state.g.dart';
 
 @immutable
 class SpooferMockStateMessage {
-  const SpooferMockStateMessage({
-    required this.id,
-    required this.text,
-  });
+  const SpooferMockStateMessage({required this.id, required this.text});
 
   final int id;
   final String text;

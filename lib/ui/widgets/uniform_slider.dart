@@ -64,7 +64,10 @@ class _UniformTrackShape extends SliderTrackShape with BaseSliderTrackShape {
       isDiscrete: isDiscrete,
     );
     final paint = Paint()
-      ..color = sliderTheme.inactiveTrackColor ?? sliderTheme.activeTrackColor ?? Colors.grey
+      ..color =
+          sliderTheme.inactiveTrackColor ??
+          sliderTheme.activeTrackColor ??
+          Colors.grey
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = trackHeight;

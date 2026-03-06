@@ -13,27 +13,27 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import '../../controllers/mock_location_controller.dart';
-import '../../controllers/preferences_controller.dart';
-import '../../spoofer/bloc/map/spoofer_map_bloc.dart';
-import '../../spoofer/bloc/map/spoofer_map_event.dart';
-import '../../spoofer/bloc/map/spoofer_map_state.dart';
-import '../../spoofer/bloc/message/spoofer_message_bloc.dart';
-import '../../spoofer/bloc/message/spoofer_message_event.dart';
-import '../../spoofer/bloc/message/spoofer_message_state.dart';
-import '../../spoofer/bloc/mock/spoofer_mock_bloc.dart';
-import '../../spoofer/bloc/mock/spoofer_mock_event.dart';
-import '../../spoofer/bloc/mock/spoofer_mock_state.dart';
-import '../../spoofer/bloc/playback/spoofer_playback_bloc.dart';
-import '../../spoofer/bloc/playback/spoofer_playback_event.dart';
-import '../../spoofer/bloc/playback/spoofer_playback_state.dart';
-import '../../spoofer/bloc/route/spoofer_route_bloc.dart';
-import '../../spoofer/bloc/route/spoofer_route_event.dart';
-import '../../spoofer/bloc/route/spoofer_route_state.dart';
-import '../../spoofer/bloc/settings/spoofer_settings_bloc.dart';
-import '../../spoofer/bloc/settings/spoofer_settings_event.dart';
-import '../../spoofer/bloc/settings/spoofer_settings_state.dart';
-import '../../spoofer/coordinator/spoofer_runtime_coordinator.dart';
+import '../../bloc/map/spoofer_map_bloc.dart';
+import '../../bloc/map/spoofer_map_event.dart';
+import '../../bloc/map/spoofer_map_state.dart';
+import '../../bloc/message/spoofer_message_bloc.dart';
+import '../../bloc/message/spoofer_message_event.dart';
+import '../../bloc/message/spoofer_message_state.dart';
+import '../../bloc/mock/spoofer_mock_bloc.dart';
+import '../../bloc/mock/spoofer_mock_event.dart';
+import '../../bloc/mock/spoofer_mock_state.dart';
+import '../../bloc/playback/spoofer_playback_bloc.dart';
+import '../../bloc/playback/spoofer_playback_event.dart';
+import '../../bloc/playback/spoofer_playback_state.dart';
+import '../../bloc/route/spoofer_route_bloc.dart';
+import '../../bloc/route/spoofer_route_event.dart';
+import '../../bloc/route/spoofer_route_state.dart';
+import '../../bloc/settings/spoofer_settings_bloc.dart';
+import '../../bloc/settings/spoofer_settings_event.dart';
+import '../../bloc/settings/spoofer_settings_state.dart';
+import '../../domain/route_playback_math.dart';
+import '../../infrastructure/mock_location_gateway.dart';
+import '../../infrastructure/preferences_store.dart';
 import '../map/map_style.dart';
 import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
@@ -52,9 +52,9 @@ const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 
 class SpooferScreen extends StatefulWidget {
-  const SpooferScreen({super.key, required this.mockController});
+  const SpooferScreen({super.key, required this.mockGateway});
 
-  final MockLocationController mockController;
+  final MockLocationGateway mockGateway;
 
   @override
   State<SpooferScreen> createState() => _SpooferScreenState();
@@ -66,9 +66,8 @@ class _SpooferScreenState extends State<SpooferScreen>
 
   GoogleMapController? _mapController;
 
-  final PreferencesController _prefs = PreferencesController();
-  final SpooferRuntimeCoordinator _coordinator =
-      const SpooferRuntimeCoordinator();
+  final PreferencesStore _preferencesStore = PreferencesStore();
+  final RoutePlaybackMath _routePlaybackMath = const RoutePlaybackMath();
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
   int _lastRouteMessageId = -1;
@@ -180,7 +179,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     if (defaultTargetPlatform != TargetPlatform.android) {
       return;
     }
-    final promptsShown = await _prefs.isStartupPromptsShown();
+    final promptsShown = await _preferencesStore.isStartupPromptsShown();
     if (promptsShown) {
       return;
     }
@@ -194,7 +193,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     } catch (_) {
       // First-launch prompt flow is best effort only.
     } finally {
-      await _prefs.setStartupPromptsShown(true);
+      await _preferencesStore.setStartupPromptsShown(true);
     }
   }
 
@@ -650,11 +649,11 @@ class _SpooferScreenState extends State<SpooferScreen>
   }
 
   Future<LatLng?> _getRealLocation() async {
-    final current = await widget.mockController.getCurrentLocation();
+    final current = await widget.mockGateway.getCurrentLocation();
     if (current != null) {
       return current;
     }
-    return widget.mockController.getLastKnownLocation();
+    return widget.mockGateway.getLastKnownLocation();
   }
 
   Future<void> _clearRoute() async {
@@ -736,7 +735,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       return;
     }
     final routeState = context.read<SpooferRouteBloc>().state;
-    final resolution = _coordinator.resolvePlaybackTick(
+    final resolution = _routePlaybackMath.resolvePlaybackTick(
       routeState: routeState,
       playbackState: playbackState,
     );
@@ -858,7 +857,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (context) => SearchScreen(
-          mockController: widget.mockController,
+          mockGateway: widget.mockGateway,
           onSelect: (location, zoom) {
             _setManualLocation(location, force: true, zoom: zoom);
           },
@@ -1159,7 +1158,11 @@ class _SpooferScreenState extends State<SpooferScreen>
 
     final clamped = _clamp01(value);
     final position =
-        _coordinator.positionForProgress(routeState, clamped) ??
+        _routePlaybackMath.positionForProgress(
+          points: routeState.routePoints,
+          totalDistanceMeters: routeState.totalDistanceMeters,
+          progress: clamped,
+        ) ??
         routeState.routePoints.first;
     context.read<SpooferRouteBloc>().add(
       SpooferRouteProgressSetRequested(progress: clamped),
@@ -1343,14 +1346,10 @@ class _SpooferScreenState extends State<SpooferScreen>
       context: context,
       routes: routes,
       onApply: (index) {
-        bloc.add(
-          SpooferRouteSavedRouteApplyRequested(index: index),
-        );
+        bloc.add(SpooferRouteSavedRouteApplyRequested(index: index));
       },
       onDelete: (index) async {
-        bloc.add(
-          SpooferRouteSavedRouteDeleteRequested(index: index),
-        );
+        bloc.add(SpooferRouteSavedRouteDeleteRequested(index: index));
         routes.removeAt(index);
         return routes;
       },
@@ -1637,7 +1636,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       return true;
     }
 
-    final accepted = await _prefs.isTosAccepted();
+    final accepted = await _preferencesStore.isTosAccepted();
     if (accepted) {
       _tosAccepted = true;
       return true;
@@ -1662,7 +1661,7 @@ class _SpooferScreenState extends State<SpooferScreen>
           actions: [
             FilledButton(
               onPressed: () async {
-                await _prefs.setTosAccepted(true);
+                await _preferencesStore.setTosAccepted(true);
                 if (context.mounted) {
                   Navigator.of(context).pop();
                 }
@@ -1674,7 +1673,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       ),
     );
 
-    _tosAccepted = await _prefs.isTosAccepted();
+    _tosAccepted = await _preferencesStore.isTosAccepted();
     return _tosAccepted;
   }
 

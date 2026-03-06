@@ -33,10 +33,7 @@ class SearchScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: actions,
-      ),
+      appBar: AppBar(title: Text(title), actions: actions),
       body: SafeArea(
         child: Column(
           children: [
@@ -56,11 +53,7 @@ class SearchScaffold extends StatelessWidget {
                 onSubmitted: onSubmitted,
               ),
             ),
-            if (helper != null)
-              Padding(
-                padding: helperPadding,
-                child: helper,
-              ),
+            if (helper != null) Padding(padding: helperPadding, child: helper),
             Expanded(child: body),
           ],
         ),

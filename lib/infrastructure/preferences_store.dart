@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class PreferencesController {
+class PreferencesStore {
   static const String _tosAcceptedKey = 'tos_accepted_v1';
   static const String _savedRoutesKey = 'saved_custom_routes_v1';
   static const String _startupPromptsShownKey = 'startup_prompts_shown_v1';

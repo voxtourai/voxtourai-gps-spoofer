@@ -1,10 +1,10 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:voxtourai_gps_spoofer/controllers/preferences_controller.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/route/spoofer_route_bloc.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/route/spoofer_route_event.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/route/spoofer_route_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_bloc.dart';
+import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_event.dart';
+import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_state.dart';
+import 'package:voxtourai_gps_spoofer/infrastructure/preferences_store.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
@@ -13,21 +13,24 @@ void main() {
   group('SpooferRouteBloc', () {
     blocTest<SpooferRouteBloc, SpooferRouteState>(
       'initializes when requested',
-      build: () => SpooferRouteBloc(
-        preferencesController: _InMemoryPreferencesController(),
-      ),
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
       act: (bloc) => bloc.add(const SpooferRouteInitialized()),
       expect: () => [
-        isA<SpooferRouteState>().having((s) => s.initialized, 'initialized', true),
+        isA<SpooferRouteState>().having(
+          (s) => s.initialized,
+          'initialized',
+          true,
+        ),
       ],
     );
 
     blocTest<SpooferRouteBloc, SpooferRouteState>(
       'loads encoded polyline into route points',
-      build: () => SpooferRouteBloc(
-        preferencesController: _InMemoryPreferencesController(),
-      ),
-      act: (bloc) => bloc.add(const SpooferRouteLoadRequested(input: _samplePolyline)),
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
+      act: (bloc) =>
+          bloc.add(const SpooferRouteLoadRequested(input: _samplePolyline)),
       expect: () => [
         isA<SpooferRouteState>()
             .having((s) => s.hasRoute, 'hasRoute', true)
@@ -38,10 +41,10 @@ void main() {
 
     blocTest<SpooferRouteBloc, SpooferRouteState>(
       'surfaces invalid polyline input as message',
-      build: () => SpooferRouteBloc(
-        preferencesController: _InMemoryPreferencesController(),
-      ),
-      act: (bloc) => bloc.add(const SpooferRouteLoadRequested(input: '{"routes": []}')),
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
+      act: (bloc) =>
+          bloc.add(const SpooferRouteLoadRequested(input: '{"routes": []}')),
       expect: () => [
         isA<SpooferRouteState>().having(
           (s) => s.message?.text,
@@ -53,14 +56,23 @@ void main() {
 
     blocTest<SpooferRouteBloc, SpooferRouteState>(
       'creates custom route, saves it, and reapplies saved route',
-      build: () => SpooferRouteBloc(
-        preferencesController: _InMemoryPreferencesController(),
-      ),
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
       act: (bloc) async {
         bloc
-          ..add(const SpooferRouteWaypointAddedRequested(position: LatLng(43.6532, -79.3832)))
-          ..add(const SpooferRouteWaypointAddedRequested(position: LatLng(43.7001, -79.4163)))
-          ..add(const SpooferRouteSavedRouteSaveRequested(name: 'Downtown test'))
+          ..add(
+            const SpooferRouteWaypointAddedRequested(
+              position: LatLng(43.6532, -79.3832),
+            ),
+          )
+          ..add(
+            const SpooferRouteWaypointAddedRequested(
+              position: LatLng(43.7001, -79.4163),
+            ),
+          )
+          ..add(
+            const SpooferRouteSavedRouteSaveRequested(name: 'Downtown test'),
+          )
           ..add(const SpooferRouteClearRequested())
           ..add(const SpooferRouteSavedRoutesLoadRequested())
           ..add(const SpooferRouteSavedRouteApplyRequested(index: 0));
@@ -76,7 +88,7 @@ void main() {
   });
 }
 
-class _InMemoryPreferencesController extends PreferencesController {
+class _InMemoryPreferencesStore extends PreferencesStore {
   bool _tosAccepted = false;
   List<Map<String, Object?>> _routes = const <Map<String, Object?>>[];
 
@@ -109,10 +121,7 @@ class _InMemoryPreferencesController extends PreferencesController {
       'name': name,
       'points': <Map<String, double>>[
         for (final p in points)
-          <String, double>{
-            'lat': p.latitude,
-            'lng': p.longitude,
-          },
+          <String, double>{'lat': p.latitude, 'lng': p.longitude},
       ],
       'names': List<String>.from(names),
     };
@@ -126,18 +135,18 @@ class _InMemoryPreferencesController extends PreferencesController {
   }
 
   static Map<String, Object?> _copyRoute(Map<String, Object?> input) {
-    final points = (input['points'] as List?)
+    final points =
+        (input['points'] as List?)
             ?.map(
               (e) => e is Map
-                  ? <String, Object?>{
-                      'lat': e['lat'],
-                      'lng': e['lng'],
-                    }
+                  ? <String, Object?>{'lat': e['lat'], 'lng': e['lng']}
                   : <String, Object?>{},
             )
             .toList() ??
         <Map<String, Object?>>[];
-    final names = (input['names'] as List?)?.map((e) => e.toString()).toList() ?? <String>[];
+    final names =
+        (input['names'] as List?)?.map((e) => e.toString()).toList() ??
+        <String>[];
     return <String, Object?>{
       'name': input['name']?.toString() ?? '',
       'points': points,

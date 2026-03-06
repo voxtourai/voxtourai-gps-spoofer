@@ -38,12 +38,7 @@ class ProgressSlider extends StatelessWidget {
         ),
         SliderTheme(
           data: sliderTheme,
-          child: Slider(
-            value: value,
-            min: 0,
-            max: 1,
-            onChanged: onChanged,
-          ),
+          child: Slider(value: value, min: 0, max: 1, onChanged: onChanged),
         ),
       ],
     );

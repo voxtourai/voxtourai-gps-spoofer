@@ -40,10 +40,7 @@ class SpooferMockStatusSetRequested extends SpooferMockEvent {
 }
 
 class SpooferMockErrorSetRequested extends SpooferMockEvent {
-  const SpooferMockErrorSetRequested({
-    required this.message,
-    this.throttle,
-  });
+  const SpooferMockErrorSetRequested({required this.message, this.throttle});
 
   final String message;
   final Duration? throttle;

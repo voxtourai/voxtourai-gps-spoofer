@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../spoofer/bloc/settings/spoofer_settings_state.dart';
+import '../../bloc/settings/spoofer_settings_state.dart';
 
 typedef SettingsBoolChanged = void Function(bool value);
 typedef SettingsDarkModeChanged = void Function(DarkModeSetting value);

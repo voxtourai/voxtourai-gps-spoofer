@@ -1,8 +1,8 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/playback/spoofer_playback_bloc.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/playback/spoofer_playback_event.dart';
-import 'package:voxtourai_gps_spoofer/spoofer/bloc/playback/spoofer_playback_state.dart';
+import 'package:voxtourai_gps_spoofer/bloc/playback/spoofer_playback_bloc.dart';
+import 'package:voxtourai_gps_spoofer/bloc/playback/spoofer_playback_event.dart';
+import 'package:voxtourai_gps_spoofer/bloc/playback/spoofer_playback_state.dart';
 
 void main() {
   group('SpooferPlaybackBloc', () {
@@ -11,15 +11,18 @@ void main() {
       build: () => SpooferPlaybackBloc(),
       act: (bloc) => bloc.add(const SpooferPlaybackInitialized()),
       expect: () => [
-        isA<SpooferPlaybackState>().having((s) => s.initialized, 'initialized', true),
+        isA<SpooferPlaybackState>().having(
+          (s) => s.initialized,
+          'initialized',
+          true,
+        ),
       ],
     );
 
     blocTest<SpooferPlaybackBloc, SpooferPlaybackState>(
       'starts ticking after play',
-      build: () => SpooferPlaybackBloc(
-        tickInterval: const Duration(milliseconds: 10),
-      ),
+      build: () =>
+          SpooferPlaybackBloc(tickInterval: const Duration(milliseconds: 10)),
       act: (bloc) => bloc.add(const SpooferPlaybackPlayRequested()),
       wait: const Duration(milliseconds: 40),
       verify: (bloc) {

@@ -4,6 +4,9 @@ This document is the chunk 5 release-prep output for the GPS spoofer repo.
 It covers the repo-side readiness for Google Play open testing and separates
 what is ready now from what still needs secrets or Play Console work.
 
+For the boss-facing "what do we still need from people?" summary, see
+`docs/play-open-testing-handoff.md`.
+
 ## Ready Now
 
 - Android release builds already produce:

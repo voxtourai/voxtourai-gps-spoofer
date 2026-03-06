@@ -27,6 +27,14 @@ Android‑first Flutter app for mocking GPS location along a route or custom way
 - CLI fallback:
   `flutter run -d <device-id> lib/main.dart`
 
+## Android Builds
+- APK:
+  `flutter build apk --release`
+- App Bundle:
+  `flutter build appbundle --release`
+- Build commands use the same `MAPS_API_KEY` sources as local runs.
+- Release builds are currently signed with the debug signing config; replace that before uploading to Google Play.
+
 ## Usage
 - Tap **Load** to paste a route; **Clear** removes it.
 - **Play** follows the route automatically; scrub **Progress** to move manually.
@@ -94,6 +102,8 @@ The app uses feature BLoCs plus a small runtime coordinator:
 
 IntelliJ shared run configs live in `.run/`:
 - `Main Local`
+- `Build APK`
+- `Build App Bundle`
 - `Flutter Analyze`
 - `Flutter Test All`
 - `Route Bloc Tests`

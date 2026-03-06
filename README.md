@@ -17,7 +17,15 @@ Android‑first Flutter app for mocking GPS location along a route or custom way
 ## Setup
 1. Set Google Maps key in `android/local.properties`:
    `MAPS_API_KEY=...`
-2. Build/run with Flutter (Android).
+2. Connect a physical Android device with Developer Options and USB debugging enabled.
+3. Install/run the app, then select it as the mock location app in Android Developer Options.
+
+## Running Locally
+- In Android Studio / IntelliJ, select your connected Android phone as the target device.
+- Use the shared `Main Local` run configuration from `.run/`.
+- The supported spoofing workflow is a physical device; emulator support is not the target setup for mock-location testing.
+- CLI fallback:
+  `flutter run -d <device-id> lib/main.dart`
 
 ## Usage
 - Tap **Load** to paste a route; **Clear** removes it.
@@ -85,6 +93,7 @@ The app uses feature BLoCs plus a small runtime coordinator:
   - `integration_test/app_smoke_test.dart`
 
 IntelliJ shared run configs live in `.run/`:
+- `Main Local`
 - `Flutter Analyze`
 - `Flutter Test All`
 - `Route Bloc Tests`

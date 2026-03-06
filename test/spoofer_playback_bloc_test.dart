@@ -61,5 +61,40 @@ void main() {
         expect(bloc.state.speedMps, -200);
       },
     );
+
+    blocTest<SpooferPlaybackBloc, SpooferPlaybackState>(
+      'pause requested stops playback and clears tick delta',
+      build: () =>
+          SpooferPlaybackBloc(tickInterval: const Duration(milliseconds: 10)),
+      act: (bloc) async {
+        bloc.add(const SpooferPlaybackPlayRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 35));
+        bloc.add(const SpooferPlaybackPauseRequested());
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.isPlaying, false);
+        expect(bloc.state.tickSequence, greaterThan(0));
+        expect(bloc.state.tickDeltaSeconds, isNull);
+      },
+    );
+
+    blocTest<SpooferPlaybackBloc, SpooferPlaybackState>(
+      'resume is ignored after an explicit pause',
+      build: () =>
+          SpooferPlaybackBloc(tickInterval: const Duration(milliseconds: 10)),
+      act: (bloc) async {
+        bloc.add(const SpooferPlaybackPlayRequested());
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        bloc
+          ..add(const SpooferPlaybackPauseRequested())
+          ..add(const SpooferPlaybackAppResumed());
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.isPlaying, false);
+        expect(bloc.state.resumeAfterPause, false);
+      },
+    );
   });
 }

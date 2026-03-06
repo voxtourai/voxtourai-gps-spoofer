@@ -8,9 +8,13 @@ import 'package:voxtourai_gps_spoofer/infrastructure/preferences_store.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
+const String _sampleRoutesJson =
+    '{"routes":[{"polyline":{"encodedPolyline":"$_samplePolyline"}}]}';
 
 void main() {
   group('SpooferRouteBloc', () {
+    late _InMemoryPreferencesStore store;
+
     blocTest<SpooferRouteBloc, SpooferRouteState>(
       'initializes when requested',
       build: () =>
@@ -40,6 +44,19 @@ void main() {
     );
 
     blocTest<SpooferRouteBloc, SpooferRouteState>(
+      'loads Routes API JSON into route points',
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
+      act: (bloc) =>
+          bloc.add(const SpooferRouteLoadRequested(input: _sampleRoutesJson)),
+      expect: () => [
+        isA<SpooferRouteState>()
+            .having((s) => s.hasRoute, 'hasRoute', true)
+            .having((s) => s.routePoints.length, 'routePoints', greaterThan(2)),
+      ],
+    );
+
+    blocTest<SpooferRouteBloc, SpooferRouteState>(
       'surfaces invalid polyline input as message',
       build: () =>
           SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
@@ -52,6 +69,50 @@ void main() {
           'Invalid polyline: input is incomplete or malformed.',
         ),
       ],
+    );
+
+    blocTest<SpooferRouteBloc, SpooferRouteState>(
+      'clamps progress updates to the route end',
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
+      act: (bloc) {
+        bloc
+          ..add(const SpooferRouteLoadRequested(input: _samplePolyline))
+          ..add(const SpooferRouteProgressSetRequested(progress: 2.0));
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.progress, 1.0);
+        expect(bloc.state.currentRoutePosition, bloc.state.routePoints.last);
+      },
+    );
+
+    blocTest<SpooferRouteBloc, SpooferRouteState>(
+      'clear resets both route and custom waypoint state',
+      build: () =>
+          SpooferRouteBloc(preferencesStore: _InMemoryPreferencesStore()),
+      act: (bloc) {
+        bloc
+          ..add(
+            const SpooferRouteWaypointAddedRequested(
+              position: LatLng(43.6532, -79.3832),
+            ),
+          )
+          ..add(
+            const SpooferRouteWaypointAddedRequested(
+              position: LatLng(43.7001, -79.4163),
+            ),
+          )
+          ..add(const SpooferRouteWaypointSelectedRequested(index: 1))
+          ..add(const SpooferRouteClearRequested());
+      },
+      wait: const Duration(milliseconds: 20),
+      verify: (bloc) {
+        expect(bloc.state.hasPoints, false);
+        expect(bloc.state.hasWaypointPoints, false);
+        expect(bloc.state.usingCustomRoute, false);
+        expect(bloc.state.selectedWaypointIndex, isNull);
+      },
     );
 
     blocTest<SpooferRouteBloc, SpooferRouteState>(
@@ -85,12 +146,43 @@ void main() {
         expect(bloc.state.savedRoutes, isNotEmpty);
       },
     );
+
+    blocTest<SpooferRouteBloc, SpooferRouteState>(
+      'deletes saved routes from state and persistence',
+      build: () => SpooferRouteBloc(
+        preferencesStore: store = _InMemoryPreferencesStore(),
+      ),
+      act: (bloc) async {
+        bloc
+          ..add(
+            const SpooferRouteWaypointAddedRequested(
+              position: LatLng(43.6532, -79.3832),
+            ),
+          )
+          ..add(
+            const SpooferRouteWaypointAddedRequested(
+              position: LatLng(43.7001, -79.4163),
+            ),
+          )
+          ..add(const SpooferRouteSavedRouteSaveRequested(name: 'Delete me'));
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+        bloc.add(const SpooferRouteSavedRouteDeleteRequested(index: 0));
+      },
+      wait: const Duration(milliseconds: 60),
+      verify: (bloc) {
+        expect(bloc.state.savedRoutes, isEmpty);
+        expect(store.savedRouteNames, isEmpty);
+      },
+    );
   });
 }
 
 class _InMemoryPreferencesStore extends PreferencesStore {
   bool _tosAccepted = false;
   List<Map<String, Object?>> _routes = const <Map<String, Object?>>[];
+
+  List<String> get savedRouteNames =>
+      _routes.map((route) => route['name']?.toString() ?? '').toList();
 
   @override
   Future<bool> isTosAccepted() async => _tosAccepted;

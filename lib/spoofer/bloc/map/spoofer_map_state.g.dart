@@ -26,6 +26,12 @@ abstract class _$SpooferMapStateCWProxy {
   SpooferMapState lastMapStyleDark(bool? lastMapStyleDark);
 
   /// Creates a new instance with the provided field values.
+  /// Passing `null` to a nullable field nullifies it, while `null` for a non-nullable field is ignored. To update a single field use `SpooferMapState(...).copyWith.fieldName(value)`.
+  ///
+  /// Example:
+  /// ```dart
+  /// SpooferMapState(...).copyWith(id: 12, name: "My name")
+  /// ```
   SpooferMapState call({
     bool initialized,
     LatLng? currentPosition,
@@ -40,43 +46,55 @@ abstract class _$SpooferMapStateCWProxy {
 }
 
 /// Callable proxy for `copyWith` functionality.
-/// Use as `instanceOfSpooferMapState.copyWith(...)` or
-/// `instanceOfSpooferMapState.copyWith.fieldName(...)`.
+/// Use as `instanceOfSpooferMapState.copyWith(...)` or call `instanceOfSpooferMapState.copyWith.fieldName(value)` for a single field.
 class _$SpooferMapStateCWProxyImpl implements _$SpooferMapStateCWProxy {
   const _$SpooferMapStateCWProxyImpl(this._value);
 
   final SpooferMapState _value;
 
   @override
-  SpooferMapState initialized(bool initialized) => call(initialized: initialized);
+  SpooferMapState initialized(bool initialized) =>
+      call(initialized: initialized);
 
   @override
-  SpooferMapState currentPosition(LatLng? currentPosition) => call(currentPosition: currentPosition);
+  SpooferMapState currentPosition(LatLng? currentPosition) =>
+      call(currentPosition: currentPosition);
 
   @override
   SpooferMapState lastInjectedPosition(LatLng? lastInjectedPosition) =>
       call(lastInjectedPosition: lastInjectedPosition);
 
   @override
-  SpooferMapState polylines(Set<Polyline> polylines) => call(polylines: polylines);
+  SpooferMapState polylines(Set<Polyline> polylines) =>
+      call(polylines: polylines);
 
   @override
   SpooferMapState markers(Set<Marker> markers) => call(markers: markers);
 
   @override
-  SpooferMapState autoFollowEnabled(bool autoFollowEnabled) => call(autoFollowEnabled: autoFollowEnabled);
+  SpooferMapState autoFollowEnabled(bool autoFollowEnabled) =>
+      call(autoFollowEnabled: autoFollowEnabled);
 
   @override
-  SpooferMapState pendingFitRoute(bool pendingFitRoute) => call(pendingFitRoute: pendingFitRoute);
+  SpooferMapState pendingFitRoute(bool pendingFitRoute) =>
+      call(pendingFitRoute: pendingFitRoute);
 
   @override
   SpooferMapState isProgrammaticMove(bool isProgrammaticMove) =>
       call(isProgrammaticMove: isProgrammaticMove);
 
   @override
-  SpooferMapState lastMapStyleDark(bool? lastMapStyleDark) => call(lastMapStyleDark: lastMapStyleDark);
+  SpooferMapState lastMapStyleDark(bool? lastMapStyleDark) =>
+      call(lastMapStyleDark: lastMapStyleDark);
 
   @override
+  /// Creates a new instance with the provided field values.
+  /// Passing `null` to a nullable field nullifies it, while `null` for a non-nullable field is ignored. To update a single field use `SpooferMapState(...).copyWith.fieldName(value)`.
+  ///
+  /// Example:
+  /// ```dart
+  /// SpooferMapState(...).copyWith(id: 12, name: "My name")
+  /// ```
   SpooferMapState call({
     Object? initialized = const $CopyWithPlaceholder(),
     Object? currentPosition = const $CopyWithPlaceholder(),
@@ -89,32 +107,48 @@ class _$SpooferMapStateCWProxyImpl implements _$SpooferMapStateCWProxy {
     Object? lastMapStyleDark = const $CopyWithPlaceholder(),
   }) {
     return SpooferMapState(
-      initialized: initialized == const $CopyWithPlaceholder() || initialized == null
+      initialized:
+          initialized == const $CopyWithPlaceholder() || initialized == null
           ? _value.initialized
+          // ignore: cast_nullable_to_non_nullable
           : initialized as bool,
       currentPosition: currentPosition == const $CopyWithPlaceholder()
           ? _value.currentPosition
+          // ignore: cast_nullable_to_non_nullable
           : currentPosition as LatLng?,
       lastInjectedPosition: lastInjectedPosition == const $CopyWithPlaceholder()
           ? _value.lastInjectedPosition
+          // ignore: cast_nullable_to_non_nullable
           : lastInjectedPosition as LatLng?,
       polylines: polylines == const $CopyWithPlaceholder() || polylines == null
           ? _value.polylines
+          // ignore: cast_nullable_to_non_nullable
           : polylines as Set<Polyline>,
       markers: markers == const $CopyWithPlaceholder() || markers == null
           ? _value.markers
+          // ignore: cast_nullable_to_non_nullable
           : markers as Set<Marker>,
-      autoFollowEnabled: autoFollowEnabled == const $CopyWithPlaceholder() || autoFollowEnabled == null
+      autoFollowEnabled:
+          autoFollowEnabled == const $CopyWithPlaceholder() ||
+              autoFollowEnabled == null
           ? _value.autoFollowEnabled
+          // ignore: cast_nullable_to_non_nullable
           : autoFollowEnabled as bool,
-      pendingFitRoute: pendingFitRoute == const $CopyWithPlaceholder() || pendingFitRoute == null
+      pendingFitRoute:
+          pendingFitRoute == const $CopyWithPlaceholder() ||
+              pendingFitRoute == null
           ? _value.pendingFitRoute
+          // ignore: cast_nullable_to_non_nullable
           : pendingFitRoute as bool,
-      isProgrammaticMove: isProgrammaticMove == const $CopyWithPlaceholder() || isProgrammaticMove == null
+      isProgrammaticMove:
+          isProgrammaticMove == const $CopyWithPlaceholder() ||
+              isProgrammaticMove == null
           ? _value.isProgrammaticMove
+          // ignore: cast_nullable_to_non_nullable
           : isProgrammaticMove as bool,
       lastMapStyleDark: lastMapStyleDark == const $CopyWithPlaceholder()
           ? _value.lastMapStyleDark
+          // ignore: cast_nullable_to_non_nullable
           : lastMapStyleDark as bool?,
     );
   }
@@ -122,6 +156,7 @@ class _$SpooferMapStateCWProxyImpl implements _$SpooferMapStateCWProxy {
 
 extension $SpooferMapStateCopyWith on SpooferMapState {
   /// Returns a callable class used to build a new instance with modified fields.
+  /// Example: `instanceOfSpooferMapState.copyWith(...)` or `instanceOfSpooferMapState.copyWith.fieldName(...)`.
   // ignore: library_private_types_in_public_api
   _$SpooferMapStateCWProxy get copyWith => _$SpooferMapStateCWProxyImpl(this);
 }

@@ -34,6 +34,12 @@ abstract class _$SpooferRouteStateCWProxy {
   SpooferRouteState message(SpooferRouteStateMessage? message);
 
   /// Creates a new instance with the provided field values.
+  /// Passing `null` to a nullable field nullifies it, while `null` for a non-nullable field is ignored. To update a single field use `SpooferRouteState(...).copyWith.fieldName(value)`.
+  ///
+  /// Example:
+  /// ```dart
+  /// SpooferRouteState(...).copyWith(id: 12, name: "My name")
+  /// ```
   SpooferRouteState call({
     bool initialized,
     int revision,
@@ -52,21 +58,22 @@ abstract class _$SpooferRouteStateCWProxy {
 }
 
 /// Callable proxy for `copyWith` functionality.
-/// Use as `instanceOfSpooferRouteState.copyWith(...)` or
-/// `instanceOfSpooferRouteState.copyWith.fieldName(...)`.
+/// Use as `instanceOfSpooferRouteState.copyWith(...)` or call `instanceOfSpooferRouteState.copyWith.fieldName(value)` for a single field.
 class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
   const _$SpooferRouteStateCWProxyImpl(this._value);
 
   final SpooferRouteState _value;
 
   @override
-  SpooferRouteState initialized(bool initialized) => call(initialized: initialized);
+  SpooferRouteState initialized(bool initialized) =>
+      call(initialized: initialized);
 
   @override
   SpooferRouteState revision(int revision) => call(revision: revision);
 
   @override
-  SpooferRouteState routePoints(List<LatLng> routePoints) => call(routePoints: routePoints);
+  SpooferRouteState routePoints(List<LatLng> routePoints) =>
+      call(routePoints: routePoints);
 
   @override
   SpooferRouteState progress(double progress) => call(progress: progress);
@@ -84,26 +91,37 @@ class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
       call(waypointPoints: waypointPoints);
 
   @override
-  SpooferRouteState waypointNames(List<String> waypointNames) => call(waypointNames: waypointNames);
+  SpooferRouteState waypointNames(List<String> waypointNames) =>
+      call(waypointNames: waypointNames);
 
   @override
   SpooferRouteState selectedWaypointIndex(int? selectedWaypointIndex) =>
       call(selectedWaypointIndex: selectedWaypointIndex);
 
   @override
-  SpooferRouteState usingCustomRoute(bool usingCustomRoute) => call(usingCustomRoute: usingCustomRoute);
+  SpooferRouteState usingCustomRoute(bool usingCustomRoute) =>
+      call(usingCustomRoute: usingCustomRoute);
 
   @override
-  SpooferRouteState savedRoutes(List<Map<String, Object?>> savedRoutes) => call(savedRoutes: savedRoutes);
+  SpooferRouteState savedRoutes(List<Map<String, Object?>> savedRoutes) =>
+      call(savedRoutes: savedRoutes);
 
   @override
   SpooferRouteState savedRoutesLoaded(bool savedRoutesLoaded) =>
       call(savedRoutesLoaded: savedRoutesLoaded);
 
   @override
-  SpooferRouteState message(SpooferRouteStateMessage? message) => call(message: message);
+  SpooferRouteState message(SpooferRouteStateMessage? message) =>
+      call(message: message);
 
   @override
+  /// Creates a new instance with the provided field values.
+  /// Passing `null` to a nullable field nullifies it, while `null` for a non-nullable field is ignored. To update a single field use `SpooferRouteState(...).copyWith.fieldName(value)`.
+  ///
+  /// Example:
+  /// ```dart
+  /// SpooferRouteState(...).copyWith(id: 12, name: "My name")
+  /// ```
   SpooferRouteState call({
     Object? initialized = const $CopyWithPlaceholder(),
     Object? revision = const $CopyWithPlaceholder(),
@@ -120,44 +138,70 @@ class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
     Object? message = const $CopyWithPlaceholder(),
   }) {
     return SpooferRouteState(
-      initialized: initialized == const $CopyWithPlaceholder() || initialized == null
+      initialized:
+          initialized == const $CopyWithPlaceholder() || initialized == null
           ? _value.initialized
+          // ignore: cast_nullable_to_non_nullable
           : initialized as bool,
       revision: revision == const $CopyWithPlaceholder() || revision == null
           ? _value.revision
+          // ignore: cast_nullable_to_non_nullable
           : revision as int,
-      routePoints: routePoints == const $CopyWithPlaceholder() || routePoints == null
+      routePoints:
+          routePoints == const $CopyWithPlaceholder() || routePoints == null
           ? _value.routePoints
+          // ignore: cast_nullable_to_non_nullable
           : routePoints as List<LatLng>,
       progress: progress == const $CopyWithPlaceholder() || progress == null
           ? _value.progress
+          // ignore: cast_nullable_to_non_nullable
           : progress as double,
-      totalDistanceMeters: totalDistanceMeters == const $CopyWithPlaceholder() || totalDistanceMeters == null
+      totalDistanceMeters:
+          totalDistanceMeters == const $CopyWithPlaceholder() ||
+              totalDistanceMeters == null
           ? _value.totalDistanceMeters
+          // ignore: cast_nullable_to_non_nullable
           : totalDistanceMeters as double,
       currentRoutePosition: currentRoutePosition == const $CopyWithPlaceholder()
           ? _value.currentRoutePosition
+          // ignore: cast_nullable_to_non_nullable
           : currentRoutePosition as LatLng?,
-      waypointPoints: waypointPoints == const $CopyWithPlaceholder() || waypointPoints == null
+      waypointPoints:
+          waypointPoints == const $CopyWithPlaceholder() ||
+              waypointPoints == null
           ? _value.waypointPoints
+          // ignore: cast_nullable_to_non_nullable
           : waypointPoints as List<LatLng>,
-      waypointNames: waypointNames == const $CopyWithPlaceholder() || waypointNames == null
+      waypointNames:
+          waypointNames == const $CopyWithPlaceholder() || waypointNames == null
           ? _value.waypointNames
+          // ignore: cast_nullable_to_non_nullable
           : waypointNames as List<String>,
-      selectedWaypointIndex: selectedWaypointIndex == const $CopyWithPlaceholder()
+      selectedWaypointIndex:
+          selectedWaypointIndex == const $CopyWithPlaceholder()
           ? _value.selectedWaypointIndex
+          // ignore: cast_nullable_to_non_nullable
           : selectedWaypointIndex as int?,
-      usingCustomRoute: usingCustomRoute == const $CopyWithPlaceholder() || usingCustomRoute == null
+      usingCustomRoute:
+          usingCustomRoute == const $CopyWithPlaceholder() ||
+              usingCustomRoute == null
           ? _value.usingCustomRoute
+          // ignore: cast_nullable_to_non_nullable
           : usingCustomRoute as bool,
-      savedRoutes: savedRoutes == const $CopyWithPlaceholder() || savedRoutes == null
+      savedRoutes:
+          savedRoutes == const $CopyWithPlaceholder() || savedRoutes == null
           ? _value.savedRoutes
+          // ignore: cast_nullable_to_non_nullable
           : savedRoutes as List<Map<String, Object?>>,
-      savedRoutesLoaded: savedRoutesLoaded == const $CopyWithPlaceholder() || savedRoutesLoaded == null
+      savedRoutesLoaded:
+          savedRoutesLoaded == const $CopyWithPlaceholder() ||
+              savedRoutesLoaded == null
           ? _value.savedRoutesLoaded
+          // ignore: cast_nullable_to_non_nullable
           : savedRoutesLoaded as bool,
       message: message == const $CopyWithPlaceholder()
           ? _value.message
+          // ignore: cast_nullable_to_non_nullable
           : message as SpooferRouteStateMessage?,
     );
   }
@@ -165,6 +209,8 @@ class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
 
 extension $SpooferRouteStateCopyWith on SpooferRouteState {
   /// Returns a callable class used to build a new instance with modified fields.
+  /// Example: `instanceOfSpooferRouteState.copyWith(...)` or `instanceOfSpooferRouteState.copyWith.fieldName(...)`.
   // ignore: library_private_types_in_public_api
-  _$SpooferRouteStateCWProxy get copyWith => _$SpooferRouteStateCWProxyImpl(this);
+  _$SpooferRouteStateCWProxy get copyWith =>
+      _$SpooferRouteStateCWProxyImpl(this);
 }

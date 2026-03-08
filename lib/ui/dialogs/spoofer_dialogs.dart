@@ -65,89 +65,20 @@ Future<String?> showSaveRouteDialog({
   required BuildContext context,
   required String suggestedName,
 }) async {
-  final controller = TextEditingController(text: suggestedName);
-  final result = await showDialog<String>(
+  return showDialog<String>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Save route'),
-      content: TextField(
-        controller: controller,
-        decoration: const InputDecoration(
-          hintText: 'Route name',
-          border: OutlineInputBorder(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-          child: const Text('Save'),
-        ),
-      ],
-    ),
+    builder: (context) => _SaveRouteDialog(suggestedName: suggestedName),
   );
-  controller.dispose();
-  return result;
 }
 
 Future<String?> showRenameWaypointDialog({
   required BuildContext context,
   required String currentName,
 }) async {
-  final controller = TextEditingController();
-  final focusNode = FocusNode();
-  var canSave = false;
-  final result = await showDialog<String>(
+  return showDialog<String>(
     context: context,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setDialogState) {
-        return AlertDialog(
-          title: const Text('Rename waypoint'),
-          content: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: currentName,
-              border: const OutlineInputBorder(),
-            ),
-            onChanged: (value) {
-              final nextCanSave = value.trim().isNotEmpty;
-              if (nextCanSave != canSave) {
-                setDialogState(() {
-                  canSave = nextCanSave;
-                });
-              }
-            },
-            onSubmitted: (value) {
-              if (value.trim().isEmpty) {
-                return;
-              }
-              Navigator.of(context).pop(value.trim());
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: canSave
-                  ? () => Navigator.of(context).pop(controller.text.trim())
-                  : null,
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    ),
+    builder: (context) => _RenameWaypointDialog(currentName: currentName),
   );
-  focusNode.dispose();
-  controller.dispose();
-  return result;
 }
 
 Future<void> showTermsOfUseDialog({
@@ -180,4 +111,136 @@ Future<void> showTermsOfUseDialog({
       ),
     ),
   );
+}
+
+class _SaveRouteDialog extends StatefulWidget {
+  const _SaveRouteDialog({required this.suggestedName});
+
+  final String suggestedName;
+
+  @override
+  State<_SaveRouteDialog> createState() => _SaveRouteDialogState();
+}
+
+class _SaveRouteDialogState extends State<_SaveRouteDialog> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.suggestedName);
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _close(String? value) {
+    _focusNode.unfocus();
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Save route'),
+      content: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Route name',
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (value) => _close(value.trim()),
+      ),
+      actions: [
+        TextButton(onPressed: () => _close(null), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () => _close(_controller.text.trim()),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RenameWaypointDialog extends StatefulWidget {
+  const _RenameWaypointDialog({required this.currentName});
+
+  final String currentName;
+
+  @override
+  State<_RenameWaypointDialog> createState() => _RenameWaypointDialogState();
+}
+
+class _RenameWaypointDialogState extends State<_RenameWaypointDialog> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _canSave = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleChanged(String value) {
+    final nextCanSave = value.trim().isNotEmpty;
+    if (nextCanSave == _canSave) {
+      return;
+    }
+    setState(() {
+      _canSave = nextCanSave;
+    });
+  }
+
+  void _close(String? value) {
+    _focusNode.unfocus();
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename waypoint'),
+      content: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: widget.currentName,
+          border: const OutlineInputBorder(),
+        ),
+        onChanged: _handleChanged,
+        onSubmitted: (value) {
+          final trimmed = value.trim();
+          if (trimmed.isEmpty) {
+            return;
+          }
+          _close(trimmed);
+        },
+      ),
+      actions: [
+        TextButton(onPressed: () => _close(null), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: _canSave ? () => _close(_controller.text.trim()) : null,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
 }

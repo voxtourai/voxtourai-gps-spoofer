@@ -28,9 +28,6 @@ These are the inputs that cannot be invented from the repo:
 - Upload keystore ownership decision:
   - who owns the Play upload keystore
   - where the keystore file and credentials will be stored
-- Public app name:
-  - whether the Play-visible name stays close to `voxtourai_gps_spoofer`
-  - or gets a cleaner tester-facing name
 - App icon / logo:
   - current launcher icon is still the default Flutter icon
 - Store screenshots:
@@ -69,7 +66,7 @@ These steps cannot be completed from the repo alone:
 
 ### Product/branding blockers
 
-- app label is still `voxtourai_gps_spoofer`
+- current public app name is `GPS Spoofer`, but the launcher icon is still unfinished
 - launcher icon is still the default Flutter icon
 - store screenshots and listing copy do not exist in this repo
 
@@ -80,17 +77,16 @@ These steps cannot be completed from the repo alone:
 ## Recommended Next Sequence
 
 1. Get the upload keystore decision from your boss.
-2. Get the final tester-facing app name.
-3. Get or create the icon and listing screenshots.
-4. Get the short description, full description, and support details.
-5. Add local signing credentials and build the final upload AAB.
-6. Hand the signed AAB plus listing inputs to whoever owns Play Console access.
-7. Create and roll out the open-testing release in Play Console.
+2. Get or create the icon and listing screenshots.
+3. Get the short description, full description, and support details.
+4. Add local signing credentials and build the final upload AAB.
+5. Hand the signed AAB plus listing inputs to whoever owns Play Console access.
+6. Create and roll out the open-testing release in Play Console.
 
 ## Fast Status Answer
 
 If your boss asks "what is left before open testing?" the short answer is:
 
 - The repo is technically prepared for a signed AAB build.
-- The remaining blockers are the upload keystore, app name/icon/listing assets,
-  and the Play Console setup itself.
+- The remaining blockers are the upload keystore, icon/listing assets, and the
+  Play Console setup itself.

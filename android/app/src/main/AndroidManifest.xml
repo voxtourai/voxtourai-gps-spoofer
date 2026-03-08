@@ -11,7 +11,7 @@
         android:name="android.permission.ACCESS_MOCK_LOCATION"
         tools:ignore="MockLocation" />
     <application
-        android:label="voxtourai_gps_spoofer"
+        android:label="GPS Spoofer"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

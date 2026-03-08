@@ -110,7 +110,7 @@ Required local inputs:
 
 ### Blocked Until Product/Branding Decision
 
-- app label in `AndroidManifest.xml` is still `voxtourai_gps_spoofer`
+- app label in `AndroidManifest.xml` is now `GPS Spoofer`
 - launcher icon is still the default Flutter icon
 - final store name, icon, screenshots, and listing copy are not part of the repo
 
@@ -133,7 +133,7 @@ Required local inputs:
    - `flutter build appbundle --release`
 4. Verify the produced artifact:
    - `build/app/outputs/bundle/release/app-release.aab`
-5. Replace the default app label/icon before external testing.
+5. Replace the default launcher icon before external testing.
 6. Upload the AAB to Play Console open testing.
 
 ## Meeting Summary Version

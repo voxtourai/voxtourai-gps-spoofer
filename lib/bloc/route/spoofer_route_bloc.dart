@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../domain/route_playback_math.dart';
 import '../../infrastructure/preferences_store.dart';
+import '../../models/saved_route.dart';
 
 import 'spoofer_route_event.dart';
 import 'spoofer_route_state.dart';
@@ -42,7 +43,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
   List<String> _waypointNames = <String>[];
   int? _selectedWaypointIndex;
   bool _usingCustomRoute = false;
-  List<Map<String, Object?>> _savedRoutes = const <Map<String, Object?>>[];
+  List<SavedRoute> _savedRoutes = const <SavedRoute>[];
   bool _savedRoutesLoaded = false;
   int _messageId = 0;
   int _revision = 0;
@@ -176,8 +177,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     if (event.index < 0 || event.index >= _savedRoutes.length) {
       return;
     }
-    final updated = List<Map<String, Object?>>.from(_savedRoutes)
-      ..removeAt(event.index);
+    final updated = List<SavedRoute>.from(_savedRoutes)..removeAt(event.index);
     await _preferencesStore.saveRoutes(updated);
     _savedRoutes = updated;
     _savedRoutesLoaded = true;
@@ -193,31 +193,11 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
     }
 
     final route = _savedRoutes[event.index];
-    final points = <LatLng>[];
-    final names = <String>[];
-    final rawPoints = route['points'];
-    if (rawPoints is List) {
-      for (final item in rawPoints) {
-        if (item is Map) {
-          final lat = item['lat'];
-          final lng = item['lng'];
-          if (lat is num && lng is num) {
-            points.add(LatLng(lat.toDouble(), lng.toDouble()));
-          }
-        }
-      }
-    }
-    final rawNames = route['names'];
-    if (rawNames is List) {
-      for (final item in rawNames) {
-        names.add(item.toString());
-      }
-    }
-    if (points.isEmpty) {
+    if (route.points.isEmpty) {
       emit(_buildState(message: 'Saved route is empty.'));
       return;
     }
-    _setWaypointsFromSaved(points, names);
+    _setWaypointsFromSaved(route.points, route.waypointNames);
     _rebuildRouteFromWaypoints();
     emit(_buildState());
   }
@@ -367,7 +347,7 @@ class SpooferRouteBloc extends Bloc<SpooferRouteEvent, SpooferRouteState> {
       waypointNames: List<String>.unmodifiable(_waypointNames),
       selectedWaypointIndex: _selectedWaypointIndex,
       usingCustomRoute: _usingCustomRoute,
-      savedRoutes: List<Map<String, Object?>>.unmodifiable(_savedRoutes),
+      savedRoutes: List<SavedRoute>.unmodifiable(_savedRoutes),
       savedRoutesLoaded: _savedRoutesLoaded,
       message: messageModel,
     );

@@ -5,6 +5,7 @@ import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_event.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_state.dart';
 import 'package:voxtourai_gps_spoofer/infrastructure/preferences_store.dart';
+import 'package:voxtourai_gps_spoofer/models/saved_route.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
@@ -179,10 +180,10 @@ void main() {
 
 class _InMemoryPreferencesStore extends PreferencesStore {
   bool _tosAccepted = false;
-  List<Map<String, Object?>> _routes = const <Map<String, Object?>>[];
+  List<SavedRoute> _routes = const <SavedRoute>[];
 
   List<String> get savedRouteNames =>
-      _routes.map((route) => route['name']?.toString() ?? '').toList();
+      _routes.map((route) => route.name).toList();
 
   @override
   Future<bool> isTosAccepted() async => _tosAccepted;
@@ -193,13 +194,15 @@ class _InMemoryPreferencesStore extends PreferencesStore {
   }
 
   @override
-  Future<List<Map<String, Object?>>> loadSavedRoutes() async {
-    return _routes.map(_copyRoute).toList();
+  Future<List<SavedRoute>> loadSavedRoutes() async {
+    return _routes.map((route) => SavedRoute.fromJson(route.toJson())).toList();
   }
 
   @override
-  Future<void> saveRoutes(List<Map<String, Object?>> routes) async {
-    _routes = routes.map(_copyRoute).toList();
+  Future<void> saveRoutes(List<SavedRoute> routes) async {
+    _routes = routes
+        .map((route) => SavedRoute.fromJson(route.toJson()))
+        .toList();
   }
 
   @override
@@ -209,40 +212,17 @@ class _InMemoryPreferencesStore extends PreferencesStore {
     required List<String> names,
   }) async {
     final routes = await loadSavedRoutes();
-    final entry = <String, Object?>{
-      'name': name,
-      'points': <Map<String, double>>[
-        for (final p in points)
-          <String, double>{'lat': p.latitude, 'lng': p.longitude},
-      ],
-      'names': List<String>.from(names),
-    };
-    final index = routes.indexWhere((e) => e['name'] == name);
+    final entry = SavedRoute(
+      name: name,
+      points: List<LatLng>.unmodifiable(points),
+      waypointNames: List<String>.unmodifiable(names),
+    );
+    final index = routes.indexWhere((route) => route.name == name);
     if (index >= 0) {
       routes[index] = entry;
     } else {
       routes.add(entry);
     }
     await saveRoutes(routes);
-  }
-
-  static Map<String, Object?> _copyRoute(Map<String, Object?> input) {
-    final points =
-        (input['points'] as List?)
-            ?.map(
-              (e) => e is Map
-                  ? <String, Object?>{'lat': e['lat'], 'lng': e['lng']}
-                  : <String, Object?>{},
-            )
-            .toList() ??
-        <Map<String, Object?>>[];
-    final names =
-        (input['names'] as List?)?.map((e) => e.toString()).toList() ??
-        <String>[];
-    return <String, Object?>{
-      'name': input['name']?.toString() ?? '',
-      'points': points,
-      'names': names,
-    };
   }
 }

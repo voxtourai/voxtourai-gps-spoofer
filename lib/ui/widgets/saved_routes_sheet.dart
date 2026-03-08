@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 
-typedef SavedRoutesDelete =
-    Future<List<Map<String, Object?>>> Function(int index);
+import '../../models/saved_route.dart';
+
+typedef SavedRoutesDelete = Future<List<SavedRoute>> Function(int index);
 
 Future<bool> showSavedRoutesSheet({
   required BuildContext context,
-  required List<Map<String, Object?>> routes,
+  required List<SavedRoute> routes,
   required ValueChanged<int> onApply,
   required SavedRoutesDelete onDelete,
 }) async {
   var loaded = false;
-  final items = List<Map<String, Object?>>.from(routes);
+  final items = List<SavedRoute>.from(routes);
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -30,11 +31,9 @@ Future<bool> showSavedRoutesSheet({
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final item = items[index];
-              final name = item['name']?.toString() ?? 'Route';
-              final points = (item['points'] as List?) ?? const <Object>[];
               return ListTile(
-                title: Text(name),
-                subtitle: Text('${points.length} points'),
+                title: Text(item.name),
+                subtitle: Text('${item.points.length} points'),
                 onTap: () {
                   onApply(index);
                   loaded = true;

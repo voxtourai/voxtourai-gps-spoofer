@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 
+import '../../models/saved_route.dart';
+
 part 'spoofer_route_state.g.dart';
 
 @immutable
@@ -26,7 +28,7 @@ class SpooferRouteState {
     this.waypointNames = const <String>[],
     this.selectedWaypointIndex,
     this.usingCustomRoute = false,
-    this.savedRoutes = const <Map<String, Object?>>[],
+    this.savedRoutes = const <SavedRoute>[],
     this.savedRoutesLoaded = false,
     this.message,
   });
@@ -41,7 +43,7 @@ class SpooferRouteState {
   final List<String> waypointNames;
   final int? selectedWaypointIndex;
   final bool usingCustomRoute;
-  final List<Map<String, Object?>> savedRoutes;
+  final List<SavedRoute> savedRoutes;
   final bool savedRoutesLoaded;
   final SpooferRouteStateMessage? message;
 

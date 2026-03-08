@@ -27,7 +27,7 @@ abstract class _$SpooferRouteStateCWProxy {
 
   SpooferRouteState usingCustomRoute(bool usingCustomRoute);
 
-  SpooferRouteState savedRoutes(List<Map<String, Object?>> savedRoutes);
+  SpooferRouteState savedRoutes(List<SavedRoute> savedRoutes);
 
   SpooferRouteState savedRoutesLoaded(bool savedRoutesLoaded);
 
@@ -51,7 +51,7 @@ abstract class _$SpooferRouteStateCWProxy {
     List<String> waypointNames,
     int? selectedWaypointIndex,
     bool usingCustomRoute,
-    List<Map<String, Object?>> savedRoutes,
+    List<SavedRoute> savedRoutes,
     bool savedRoutesLoaded,
     SpooferRouteStateMessage? message,
   });
@@ -103,7 +103,7 @@ class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
       call(usingCustomRoute: usingCustomRoute);
 
   @override
-  SpooferRouteState savedRoutes(List<Map<String, Object?>> savedRoutes) =>
+  SpooferRouteState savedRoutes(List<SavedRoute> savedRoutes) =>
       call(savedRoutes: savedRoutes);
 
   @override
@@ -192,7 +192,7 @@ class _$SpooferRouteStateCWProxyImpl implements _$SpooferRouteStateCWProxy {
           savedRoutes == const $CopyWithPlaceholder() || savedRoutes == null
           ? _value.savedRoutes
           // ignore: cast_nullable_to_non_nullable
-          : savedRoutes as List<Map<String, Object?>>,
+          : savedRoutes as List<SavedRoute>,
       savedRoutesLoaded:
           savedRoutesLoaded == const $CopyWithPlaceholder() ||
               savedRoutesLoaded == null

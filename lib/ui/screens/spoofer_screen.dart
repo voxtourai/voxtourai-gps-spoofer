@@ -1287,7 +1287,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     if (!mounted) {
       return false;
     }
-    final routes = List<Map<String, Object?>>.from(loadedState.savedRoutes);
+    final routes = List.of(loadedState.savedRoutes);
 
     if (routes.isEmpty) {
       _showUiSnack('No saved routes yet.');

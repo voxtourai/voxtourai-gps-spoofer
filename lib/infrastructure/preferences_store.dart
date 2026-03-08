@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/saved_route.dart';
+
 class PreferencesStore {
   static const String _tosAcceptedKey = 'tos_accepted_v1';
   static const String _savedRoutesKey = 'saved_custom_routes_v1';
@@ -28,27 +30,28 @@ class PreferencesStore {
     await prefs.setBool(_startupPromptsShownKey, shown);
   }
 
-  Future<List<Map<String, Object?>>> loadSavedRoutes() async {
+  Future<List<SavedRoute>> loadSavedRoutes() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_savedRoutesKey);
     if (raw == null) {
-      return [];
+      return const <SavedRoute>[];
     }
     final decoded = jsonDecode(raw);
     if (decoded is! List) {
-      return [];
+      return const <SavedRoute>[];
     }
     return decoded
-        .whereType<Map>()
-        .map(
-          (entry) => entry.map((key, value) => MapEntry(key.toString(), value)),
-        )
+        .map(SavedRoute.maybeFromJson)
+        .whereType<SavedRoute>()
         .toList();
   }
 
-  Future<void> saveRoutes(List<Map<String, Object?>> routes) async {
+  Future<void> saveRoutes(List<SavedRoute> routes) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_savedRoutesKey, jsonEncode(routes));
+    await prefs.setString(
+      _savedRoutesKey,
+      jsonEncode(routes.map((route) => route.toJson()).toList()),
+    );
   }
 
   Future<void> upsertSavedRoute({
@@ -57,14 +60,12 @@ class PreferencesStore {
     required List<String> names,
   }) async {
     final routes = await loadSavedRoutes();
-    final entry = {
-      'name': name,
-      'points': [
-        for (final p in points) {'lat': p.latitude, 'lng': p.longitude},
-      ],
-      'names': List<String>.from(names),
-    };
-    final index = routes.indexWhere((e) => e['name'] == name);
+    final entry = SavedRoute(
+      name: name,
+      points: List<LatLng>.unmodifiable(points),
+      waypointNames: List<String>.unmodifiable(names),
+    );
+    final index = routes.indexWhere((route) => route.name == name);
     if (index >= 0) {
       routes[index] = entry;
     } else {

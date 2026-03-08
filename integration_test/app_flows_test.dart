@@ -110,9 +110,20 @@ void main() {
 
     final routeBloc = readBloc<SpooferRouteBloc>(tester);
 
-    await tapTooltip(tester, 'Waypoints');
-    await tapTooltip(tester, 'Load route', useLast: true);
-    await tapText(tester, 'Saved Waterfront Route');
+    await tapTooltip(tester, 'Waypoints', afterTapFrames: 4);
+    await tapFinder(
+      tester,
+      find.widgetWithIcon(IconButton, Icons.folder_open),
+      beforeTapFrames: 2,
+      afterTapFrames: 4,
+      reason: 'Waypoint sheet load-route action did not appear.',
+    );
+    await tapText(
+      tester,
+      'Saved Waterfront Route',
+      beforeTapFrames: 2,
+      afterTapFrames: 3,
+    );
 
     await waitForCondition(
       tester,
@@ -140,15 +151,27 @@ void main() {
     expect(settingsBloc.state.showSetupBar, isFalse);
     expect(harness.mockGateway.clearMockLocationCount, 0);
 
-    await tapTooltip(tester, 'Settings');
-    await tapText(tester, 'Show setup bar');
+    await tapTooltip(tester, 'Settings', afterTapFrames: 4);
+    await tapFinder(
+      tester,
+      find.widgetWithText(ListTile, 'Show setup bar'),
+      beforeTapFrames: 2,
+      afterTapFrames: 3,
+      reason: 'Settings sheet did not show the setup-bar toggle.',
+    );
     await waitForCondition(
       tester,
       () => settingsBloc.state.showSetupBar,
       reason: 'Settings toggle did not enable the setup bar.',
     );
 
-    await tapText(tester, 'Disable mock location');
+    await tapFinder(
+      tester,
+      find.widgetWithText(OutlinedButton, 'Disable mock location'),
+      beforeTapFrames: 1,
+      afterTapFrames: 3,
+      reason: 'Disable mock location action did not appear.',
+    );
     await waitForCondition(
       tester,
       () => harness.mockGateway.clearMockLocationCount == 1,

@@ -266,6 +266,8 @@ Future<void> tapTooltip(
   WidgetTester tester,
   String tooltip, {
   bool useLast = false,
+  int beforeTapFrames = 2,
+  int afterTapFrames = 2,
 }) async {
   final finder = find.byTooltip(tooltip);
   await waitForFinder(
@@ -273,23 +275,63 @@ Future<void> tapTooltip(
     finder,
     reason: 'Could not find tooltip "$tooltip".',
   );
+  if (beforeTapFrames > 0) {
+    await pumpFrames(tester, count: beforeTapFrames);
+  }
   final target = useLast ? finder.last : finder.first;
   await tester.ensureVisible(target);
-  await tester.tap(target);
-  await tester.pump();
+  await tester.tap(target, warnIfMissed: false);
+  if (afterTapFrames > 0) {
+    await pumpFrames(tester, count: afterTapFrames);
+  } else {
+    await tester.pump();
+  }
 }
 
 Future<void> tapText(
   WidgetTester tester,
   String text, {
   bool useLast = false,
+  int beforeTapFrames = 2,
+  int afterTapFrames = 2,
 }) async {
   final finder = find.text(text);
   await waitForFinder(tester, finder, reason: 'Could not find text "$text".');
+  if (beforeTapFrames > 0) {
+    await pumpFrames(tester, count: beforeTapFrames);
+  }
   final target = useLast ? finder.last : finder.first;
   await tester.ensureVisible(target);
-  await tester.tap(target);
-  await tester.pump();
+  await tester.tap(target, warnIfMissed: false);
+  if (afterTapFrames > 0) {
+    await pumpFrames(tester, count: afterTapFrames);
+  } else {
+    await tester.pump();
+  }
+}
+
+Future<void> tapFinder(
+  WidgetTester tester,
+  Finder finder, {
+  int beforeTapFrames = 2,
+  int afterTapFrames = 2,
+  String? reason,
+}) async {
+  await waitForFinder(
+    tester,
+    finder,
+    reason: reason ?? 'Could not find ${finder.description}.',
+  );
+  if (beforeTapFrames > 0) {
+    await pumpFrames(tester, count: beforeTapFrames);
+  }
+  await tester.ensureVisible(finder);
+  await tester.tap(finder, warnIfMissed: false);
+  if (afterTapFrames > 0) {
+    await pumpFrames(tester, count: afterTapFrames);
+  } else {
+    await tester.pump();
+  }
 }
 
 T readBloc<T>(WidgetTester tester) {

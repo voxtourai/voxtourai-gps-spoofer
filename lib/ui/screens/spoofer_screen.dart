@@ -54,12 +54,38 @@ const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
 
 class SpooferScreen extends StatefulWidget {
-  const SpooferScreen({super.key, required this.mockGateway});
+  const SpooferScreen({
+    super.key,
+    required this.mockGateway,
+    PreferencesStore? preferencesStore,
+    RoutePlaybackMath? routePlaybackMath,
+    this.launchOptions = const SpooferScreenLaunchOptions(),
+  }) : preferencesStore = preferencesStore ?? PreferencesStore(),
+       routePlaybackMath = routePlaybackMath ?? const RoutePlaybackMath();
 
   final MockLocationGateway mockGateway;
+  final PreferencesStore preferencesStore;
+  final RoutePlaybackMath routePlaybackMath;
+  final SpooferScreenLaunchOptions launchOptions;
 
   @override
   State<SpooferScreen> createState() => _SpooferScreenState();
+}
+
+class SpooferScreenLaunchOptions {
+  const SpooferScreenLaunchOptions({
+    this.initializeNotifications = true,
+    this.manageBackgroundNotifications = true,
+    this.runFirstLaunchPrompts = true,
+    this.enableBackgroundModeOnLaunch = true,
+    this.runStartupChecksOnLaunch = true,
+  });
+
+  final bool initializeNotifications;
+  final bool manageBackgroundNotifications;
+  final bool runFirstLaunchPrompts;
+  final bool enableBackgroundModeOnLaunch;
+  final bool runStartupChecksOnLaunch;
 }
 
 class _SpooferScreenState extends State<SpooferScreen>
@@ -68,8 +94,6 @@ class _SpooferScreenState extends State<SpooferScreen>
 
   GoogleMapController? _mapController;
 
-  final PreferencesStore _preferencesStore = PreferencesStore();
-  final RoutePlaybackMath _routePlaybackMath = const RoutePlaybackMath();
   OverlayEntry? _overlayMessage;
   int _lastMessageId = -1;
   int _lastRouteMessageId = -1;
@@ -99,16 +123,24 @@ class _SpooferScreenState extends State<SpooferScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_initNotifications());
+    if (widget.launchOptions.initializeNotifications) {
+      unawaited(_initNotifications());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final accepted = await _ensureTosAccepted();
       if (accepted) {
-        await _runFirstLaunchPrompts();
-        await _setBackgroundMode(true, showFeedback: false);
+        if (widget.launchOptions.runFirstLaunchPrompts) {
+          await _runFirstLaunchPrompts();
+        }
+        if (widget.launchOptions.enableBackgroundModeOnLaunch) {
+          await _setBackgroundMode(true, showFeedback: false);
+        }
         if (!mounted) {
           return;
         }
-        _requestStartupChecks(showDialogs: true);
+        if (widget.launchOptions.runStartupChecksOnLaunch) {
+          _requestStartupChecks(showDialogs: true);
+        }
       }
     });
   }
@@ -118,7 +150,9 @@ class _SpooferScreenState extends State<SpooferScreen>
     WidgetsBinding.instance.removeObserver(this);
     _overlayMessage?.remove();
     _overlayMessage = null;
-    unawaited(_notifications.cancel(_backgroundNotificationId));
+    if (widget.launchOptions.manageBackgroundNotifications) {
+      unawaited(_notifications.cancel(_backgroundNotificationId));
+    }
     _routeController.dispose();
     super.dispose();
   }
@@ -131,7 +165,11 @@ class _SpooferScreenState extends State<SpooferScreen>
     } else {
       playbackBloc.add(const SpooferPlaybackAppPaused());
     }
-    unawaited(_syncBackgroundNotificationVisibility(appLifecycleState: state));
+    if (widget.launchOptions.manageBackgroundNotifications) {
+      unawaited(
+        _syncBackgroundNotificationVisibility(appLifecycleState: state),
+      );
+    }
   }
 
   @override
@@ -181,7 +219,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     if (defaultTargetPlatform != TargetPlatform.android) {
       return;
     }
-    final promptsShown = await _preferencesStore.isStartupPromptsShown();
+    final promptsShown = await widget.preferencesStore.isStartupPromptsShown();
     if (promptsShown) {
       return;
     }
@@ -195,11 +233,14 @@ class _SpooferScreenState extends State<SpooferScreen>
     } catch (_) {
       // First-launch prompt flow is best effort only.
     } finally {
-      await _preferencesStore.setStartupPromptsShown(true);
+      await widget.preferencesStore.setStartupPromptsShown(true);
     }
   }
 
   Future<void> _showBackgroundNotification() async {
+    if (!widget.launchOptions.manageBackgroundNotifications) {
+      return;
+    }
     if (_settingsState.backgroundNotificationShown) {
       return;
     }
@@ -238,6 +279,9 @@ class _SpooferScreenState extends State<SpooferScreen>
   }
 
   Future<void> _cancelBackgroundNotification() async {
+    if (!widget.launchOptions.manageBackgroundNotifications) {
+      return;
+    }
     if (!_settingsState.backgroundNotificationShown) {
       return;
     }
@@ -271,6 +315,9 @@ class _SpooferScreenState extends State<SpooferScreen>
     SpooferRouteState? routeState,
     AppLifecycleState? appLifecycleState,
   }) async {
+    if (!widget.launchOptions.manageBackgroundNotifications) {
+      return;
+    }
     if (_shouldShowBackgroundNotification(
       playbackState: playbackState,
       routeState: routeState,
@@ -737,7 +784,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       return;
     }
     final routeState = context.read<SpooferRouteBloc>().state;
-    final resolution = _routePlaybackMath.resolvePlaybackTick(
+    final resolution = widget.routePlaybackMath.resolvePlaybackTick(
       routeState: routeState,
       playbackState: playbackState,
     );
@@ -1044,7 +1091,7 @@ class _SpooferScreenState extends State<SpooferScreen>
 
     final clamped = _clamp01(value);
     final position =
-        _routePlaybackMath.positionForProgress(
+        widget.routePlaybackMath.positionForProgress(
           points: routeState.routePoints,
           totalDistanceMeters: routeState.totalDistanceMeters,
           progress: clamped,
@@ -1393,7 +1440,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       return true;
     }
 
-    final accepted = await _preferencesStore.isTosAccepted();
+    final accepted = await widget.preferencesStore.isTosAccepted();
     if (accepted) {
       _tosAccepted = true;
       return true;
@@ -1405,10 +1452,10 @@ class _SpooferScreenState extends State<SpooferScreen>
 
     await showTermsOfUseDialog(
       context: context,
-      onAgree: () => _preferencesStore.setTosAccepted(true),
+      onAgree: () => widget.preferencesStore.setTosAccepted(true),
     );
 
-    _tosAccepted = await _preferencesStore.isTosAccepted();
+    _tosAccepted = await widget.preferencesStore.isTosAccepted();
     return _tosAccepted;
   }
 

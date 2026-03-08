@@ -12,28 +12,71 @@ import 'bloc/route/spoofer_route_bloc.dart';
 import 'bloc/route/spoofer_route_event.dart';
 import 'bloc/settings/spoofer_settings_bloc.dart';
 import 'bloc/settings/spoofer_settings_state.dart';
+import 'domain/route_playback_math.dart';
 import 'infrastructure/mock_location_gateway.dart';
+import 'infrastructure/preferences_store.dart';
 import 'ui/screens/spoofer_screen.dart';
 
+class GpsSpooferAppDependencies {
+  const GpsSpooferAppDependencies({
+    this.mockGateway,
+    this.preferencesStore,
+    this.routePlaybackMath,
+    this.playbackTickInterval,
+    this.requestLocationPermission,
+    this.openAppSettingsAction,
+  });
+
+  final MockLocationGateway? mockGateway;
+  final PreferencesStore? preferencesStore;
+  final RoutePlaybackMath? routePlaybackMath;
+  final Duration? playbackTickInterval;
+  final RequestLocationPermission? requestLocationPermission;
+  final OpenAppSettingsAction? openAppSettingsAction;
+}
+
 class GpsSpooferApp extends StatelessWidget {
-  const GpsSpooferApp({super.key});
+  const GpsSpooferApp({
+    super.key,
+    this.dependencies,
+    this.screenLaunchOptions = const SpooferScreenLaunchOptions(),
+  });
+
+  final GpsSpooferAppDependencies? dependencies;
+  final SpooferScreenLaunchOptions screenLaunchOptions;
 
   @override
   Widget build(BuildContext context) {
+    final appDependencies = dependencies;
+    final mockGateway = appDependencies?.mockGateway ?? mockLocationGateway;
+    final preferencesStore =
+        appDependencies?.preferencesStore ?? PreferencesStore();
+    final routePlaybackMath =
+        appDependencies?.routePlaybackMath ?? const RoutePlaybackMath();
+    final playbackTickInterval =
+        appDependencies?.playbackTickInterval ??
+        const Duration(milliseconds: 50);
+
     return MultiBlocProvider(
       providers: [
         BlocProvider<SpooferRouteBloc>(
-          create: (_) =>
-              SpooferRouteBloc()..add(const SpooferRouteInitialized()),
+          create: (_) => SpooferRouteBloc(
+            preferencesStore: preferencesStore,
+            routePlaybackMath: routePlaybackMath,
+          )..add(const SpooferRouteInitialized()),
         ),
         BlocProvider<SpooferPlaybackBloc>(
           create: (_) =>
-              SpooferPlaybackBloc()..add(const SpooferPlaybackInitialized()),
+              SpooferPlaybackBloc(tickInterval: playbackTickInterval)
+                ..add(const SpooferPlaybackInitialized()),
         ),
         BlocProvider<SpooferMockBloc>(
-          create: (_) =>
-              SpooferMockBloc(mockGateway: mockLocationGateway)
-                ..add(const SpooferMockInitialized()),
+          create: (_) => SpooferMockBloc(
+            mockGateway: mockGateway,
+            requestLocationPermission:
+                appDependencies?.requestLocationPermission,
+            openAppSettingsAction: appDependencies?.openAppSettingsAction,
+          )..add(const SpooferMockInitialized()),
         ),
         BlocProvider<SpooferMapBloc>(
           create: (_) => SpooferMapBloc()..add(const SpooferMapInitialized()),
@@ -63,7 +106,12 @@ class GpsSpooferApp extends StatelessWidget {
               useMaterial3: true,
             ),
             themeMode: themeMode,
-            home: const SpooferScreen(mockGateway: mockLocationGateway),
+            home: SpooferScreen(
+              mockGateway: mockGateway,
+              preferencesStore: preferencesStore,
+              routePlaybackMath: routePlaybackMath,
+              launchOptions: screenLaunchOptions,
+            ),
           );
         },
       ),

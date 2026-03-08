@@ -35,6 +35,7 @@ import '../../domain/route_playback_math.dart';
 import '../../infrastructure/mock_location_gateway.dart';
 import '../../infrastructure/preferences_store.dart';
 import '../map/map_style.dart';
+import '../map/route_map_projection.dart';
 import '../help/help_content.dart';
 import '../widgets/controls_panel.dart';
 import '../widgets/route_input_dialog.dart';
@@ -590,7 +591,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     final bool hasRoute = routeState.hasRoute;
     final progressLabel = '${(routeState.progress * 100).toStringAsFixed(0)}%';
     final distanceLabel = routeState.totalDistanceMeters > 0
-        ? '${_formatDistance(routeState.progressDistance)} / ${_formatDistance(routeState.totalDistanceMeters)}'
+        ? '${formatDistanceMeters(routeState.progressDistance)} / ${formatDistanceMeters(routeState.totalDistanceMeters)}'
         : '0 m';
 
     return ControlsPanel(
@@ -695,7 +696,7 @@ class _SpooferScreenState extends State<SpooferScreen>
         context.read<SpooferPlaybackBloc>().state.isPlaying) {
       _stopPlayback();
     }
-    _setMapPolylines(_buildRoutePolylines(routeState.routePoints));
+    _setMapPolylines(buildRoutePolylines(routeState.routePoints));
     _refreshMarkers(routeState);
     unawaited(_syncBackgroundNotificationVisibility(routeState: routeState));
   }
@@ -756,20 +757,6 @@ class _SpooferScreenState extends State<SpooferScreen>
       return;
     }
     _setProgress(resolution.progress);
-  }
-
-  Set<Polyline> _buildRoutePolylines(List<LatLng> points) {
-    if (points.length < 2) {
-      return const <Polyline>{};
-    }
-    return <Polyline>{
-      Polyline(
-        polylineId: const PolylineId('route'),
-        color: Colors.blueAccent,
-        width: 4,
-        points: points,
-      ),
-    };
   }
 
   EdgeInsets _mapPaddingForCamera(BuildContext context) {
@@ -1200,59 +1187,23 @@ class _SpooferScreenState extends State<SpooferScreen>
 
   void _refreshMarkers([SpooferRouteState? routeState]) {
     final state = routeState ?? context.read<SpooferRouteBloc>().state;
-    final markers = <Marker>{};
-    final currentPosition = _mapState.currentPosition;
-    if (_settingsState.showMockMarker && currentPosition != null) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('current'),
-          position: currentPosition,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-          infoWindow: const InfoWindow(title: 'Mocked GPS'),
-          zIndexInt: 1,
-        ),
-      );
-    }
-    for (var i = 0; i < state.waypointPoints.length; i++) {
-      markers.add(
-        Marker(
-          markerId: MarkerId('wp_$i'),
-          position: state.waypointPoints[i],
-          draggable: true,
-          onDragEnd: (position) {
-            context.read<SpooferRouteBloc>().add(
-              SpooferRouteWaypointUpdatedRequested(
-                index: i,
-                position: position,
-              ),
-            );
-            context.read<SpooferRouteBloc>().add(
-              SpooferRouteWaypointSelectedRequested(index: i),
-            );
-          },
-          onTap: () {
-            context.read<SpooferRouteBloc>().add(
-              SpooferRouteWaypointSelectedRequested(index: i),
-            );
-          },
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            i == state.selectedWaypointIndex
-                ? BitmapDescriptor.hueRed
-                : BitmapDescriptor.hueOrange,
-          ),
-          infoWindow: InfoWindow(
-            title: state.waypointNames.length > i
-                ? state.waypointNames[i]
-                : _defaultWaypointName(i),
-            snippet: 'Hold and drag to move',
-          ),
-          zIndexInt: 2,
-        ),
-      );
-    }
-    _setMapMarkers(markers);
+    _setMapMarkers(
+      buildRouteMarkers(
+        routeState: state,
+        currentPosition: _mapState.currentPosition,
+        showMockMarker: _settingsState.showMockMarker,
+        onWaypointTap: _selectCustomPoint,
+        onWaypointDragEnd: (index, position) {
+          context.read<SpooferRouteBloc>().add(
+            SpooferRouteWaypointUpdatedRequested(
+              index: index,
+              position: position,
+            ),
+          );
+          _selectCustomPoint(index);
+        },
+      ),
+    );
   }
 
   void _addCustomPoint(LatLng position) {
@@ -1368,8 +1319,6 @@ class _SpooferScreenState extends State<SpooferScreen>
     }
   }
 
-  String _defaultWaypointName(int index) => 'Waypoint ${index + 1}';
-
   Future<void> _renameCustomPoint(int index) async {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (index < 0 || index >= routeState.waypointPoints.length) {
@@ -1445,7 +1394,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       onSelect: _selectCustomPoint,
       onRename: _renameCustomPoint,
       onDelete: _removeCustomPoint,
-      defaultWaypointName: _defaultWaypointName,
+      defaultWaypointName: defaultWaypointName,
     );
   }
 
@@ -1477,7 +1426,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       return;
     }
 
-    final bounds = _boundsFromLatLngs(routeState.routePoints);
+    final bounds = boundsFromLatLngs(routeState.routePoints);
     _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 48));
   }
 
@@ -1491,32 +1440,6 @@ class _SpooferScreenState extends State<SpooferScreen>
         speedMps: speedMps,
       ),
     );
-  }
-
-  LatLngBounds _boundsFromLatLngs(List<LatLng> points) {
-    var minLat = points.first.latitude;
-    var maxLat = points.first.latitude;
-    var minLng = points.first.longitude;
-    var maxLng = points.first.longitude;
-
-    for (final point in points.skip(1)) {
-      minLat = math.min(minLat, point.latitude);
-      maxLat = math.max(maxLat, point.latitude);
-      minLng = math.min(minLng, point.longitude);
-      maxLng = math.max(maxLng, point.longitude);
-    }
-
-    return LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-  }
-
-  String _formatDistance(double meters) {
-    if (meters < 1000) {
-      return '${meters.toStringAsFixed(0)} m';
-    }
-    return '${(meters / 1000).toStringAsFixed(2)} km';
   }
 
   double _clamp01(double value) {

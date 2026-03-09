@@ -1,4 +1,4 @@
-import '../../models/help_section.dart';
+import '../../model/help_section.dart';
 
 const List<HelpSection> helpSections = [
   HelpSection('Getting started', [

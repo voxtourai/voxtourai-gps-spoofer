@@ -6,7 +6,7 @@ import 'package:voxtourai_gps_spoofer/app.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'package:voxtourai_gps_spoofer/infrastructure/mock_location_gateway.dart';
 import 'package:voxtourai_gps_spoofer/infrastructure/preferences_store.dart';
-import 'package:voxtourai_gps_spoofer/models/saved_route.dart';
+import 'package:voxtourai_gps_spoofer/model/saved_route.dart';
 import 'package:voxtourai_gps_spoofer/ui/screens/spoofer_screen.dart';
 
 class RecordedMockLocationCall {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/saved_route.dart';
+import '../../model/saved_route.dart';
 
 typedef SavedRoutesDelete = Future<List<SavedRoute>> Function(int index);
 

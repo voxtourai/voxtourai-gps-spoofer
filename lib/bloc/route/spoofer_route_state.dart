@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 
-import '../../models/saved_route.dart';
+import '../../model/saved_route.dart';
 
 part 'spoofer_route_state.g.dart';
 

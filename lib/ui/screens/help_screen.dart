@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../models/help_section.dart';
+import '../../model/help_section.dart';
 import '../widgets/search_scaffold.dart';
 
 class HelpScreen extends StatefulWidget {

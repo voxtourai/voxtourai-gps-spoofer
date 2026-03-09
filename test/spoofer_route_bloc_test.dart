@@ -5,7 +5,7 @@ import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_event.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_state.dart';
 import 'package:voxtourai_gps_spoofer/infrastructure/preferences_store.dart';
-import 'package:voxtourai_gps_spoofer/models/saved_route.dart';
+import 'package:voxtourai_gps_spoofer/model/saved_route.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';

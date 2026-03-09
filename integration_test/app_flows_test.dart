@@ -6,7 +6,7 @@ import 'package:voxtourai_gps_spoofer/bloc/playback/spoofer_playback_bloc.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_event.dart';
 import 'package:voxtourai_gps_spoofer/bloc/settings/spoofer_settings_bloc.dart';
-import 'package:voxtourai_gps_spoofer/models/saved_route.dart';
+import 'package:voxtourai_gps_spoofer/model/saved_route.dart';
 
 import 'support/integration_test_harness.dart';
 

@@ -232,7 +232,7 @@ lib/
   infrastructure/
     mock_location_gateway.dart
     preferences_store.dart
-  models/
+  model/
     help_section.dart
   ui/
     help/

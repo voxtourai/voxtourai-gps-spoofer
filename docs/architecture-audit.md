@@ -195,7 +195,7 @@ feature boundary.
 ### 6. `SpooferMapBloc` stores derived render artifacts
 
 Markers and polylines are currently rebuilt from route and UI settings.
-Those are derived values, not true independent domain state.
+Those are derived values, not true independent business state.
 
 This is not the first refactor priority, but it should be treated as
 presentational state, not business state.
@@ -227,7 +227,7 @@ lib/
     playback/
     route/
     settings/
-  domain/
+  service/
     route_playback_math.dart
   infrastructure/
     mock_location_gateway.dart
@@ -248,10 +248,10 @@ lib/
 The BLoC layer remains the primary controller layer.
 No new top-level `controller` or `coordinator` concept should be introduced.
 
-### Domain layer
+### Service layer
 
 Pure math and feature rules that do not touch Flutter widgets, platform
-channels, or persistence belong in `lib/domain/`.
+channels, or persistence belong in `lib/service/`.
 
 For this repo, the first candidate is the current runtime math helper.
 
@@ -261,7 +261,7 @@ Recommended rename:
 
 Recommended target file:
 
-- `lib/domain/route_playback_math.dart`
+- `lib/service/route_playback_math.dart`
 
 ### Infrastructure layer
 
@@ -297,7 +297,7 @@ they temporarily remain in the screen during the first mechanical refactor.
 - `lib/spoofer/bloc/route/**` -> `lib/bloc/route/**`
 - `lib/spoofer/bloc/settings/**` -> `lib/bloc/settings/**`
 - `lib/spoofer/coordinator/spoofer_runtime_coordinator.dart` ->
-  `lib/domain/route_playback_math.dart`
+  `lib/service/route_playback_math.dart`
 - `lib/controllers/mock_location_controller.dart` ->
   `lib/infrastructure/mock_location_gateway.dart`
 - `lib/controllers/preferences_controller.dart` ->
@@ -310,7 +310,7 @@ After the moves:
 - `lib/app.dart` imports should reference `lib/bloc/**` and
   `lib/infrastructure/**`
 - `lib/ui/screens/spoofer_screen.dart` should import from `lib/bloc/**`,
-  `lib/domain/**`, and `lib/infrastructure/**`
+  `lib/service/**`, and `lib/infrastructure/**`
 - tests should import from the new top-level paths
 
 ## Behavior invariants for chunk 2
@@ -349,7 +349,7 @@ Chunk 2 should implement the folder flattening and renames first:
 
 1. move blocs from `lib/spoofer/bloc/**` to `lib/bloc/**`
 2. rename infrastructure adapters out of `controllers/`
-3. rename and relocate the runtime math helper into `lib/domain/`
+3. rename and relocate the runtime math helper into `lib/service/`
 4. remove duplicated interpolation math from either the bloc or the helper so
    one implementation remains
 5. run `flutter analyze` and `flutter test`

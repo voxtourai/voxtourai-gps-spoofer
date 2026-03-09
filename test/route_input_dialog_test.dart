@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voxtourai_gps_spoofer/domain/route_input_parser.dart';
+import 'package:voxtourai_gps_spoofer/service/route_input_parser.dart';
 import 'package:voxtourai_gps_spoofer/ui/widgets/route_input_dialog.dart';
 
 void main() {

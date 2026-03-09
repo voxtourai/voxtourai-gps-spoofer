@@ -9,7 +9,7 @@ runtime flow, and verification.
 The app is organized around three layers:
 
 - `bloc/`: feature-level control logic and feature state
-- `domain/`: pure route/playback math
+- `service/`: pure route/playback math
 - `infrastructure/`: platform and persistence adapters
 
 The important architectural point is that the BLoC layer is the controller
@@ -21,7 +21,7 @@ The current structure is meant to answer a simple question:
 "Where does this responsibility belong?"
 
 - If it is feature control flow or feature state, it belongs in a BLoC.
-- If it is pure math with no side effects, it belongs in `domain/`.
+- If it is pure math with no side effects, it belongs in `service/`.
 - If it touches Android platform APIs or local storage, it belongs in
   `infrastructure/`.
 - If it is widget composition or visual behavior, it belongs in `ui/`.
@@ -64,7 +64,7 @@ Feature-owned state machines:
 Each BLoC owns a narrow slice of app behavior and exposes explicit events and
 state.
 
-### `domain/`
+### `service/`
 
 - `RoutePlaybackMath`
 
@@ -370,7 +370,7 @@ That is acceptable for the current repo state because:
 
 - the feature ownership is now explicit
 - the misleading controller/coordinator naming is gone
-- the domain math is centralized and testable
+- the service math is centralized and testable
 - the remaining screen orchestration is visible in one file
 
 If this grows further, the next refactor target would be extracting some of the

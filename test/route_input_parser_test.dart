@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:voxtourai_gps_spoofer/domain/route_input_parser.dart';
+import 'package:voxtourai_gps_spoofer/service/route_input_parser.dart';
 
 void main() {
   group('extractPolylineFromInput', () {

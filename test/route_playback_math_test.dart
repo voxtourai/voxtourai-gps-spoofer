@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:voxtourai_gps_spoofer/bloc/playback/spoofer_playback_state.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_state.dart';
-import 'package:voxtourai_gps_spoofer/domain/route_playback_math.dart';
+import 'package:voxtourai_gps_spoofer/service/route_playback_math.dart';
 
 void main() {
   const routePlaybackMath = RoutePlaybackMath();

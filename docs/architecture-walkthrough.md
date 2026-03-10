@@ -6,11 +6,12 @@ runtime flow, and verification.
 
 ## Summary
 
-The app is organized around three layers:
+The app is organized around four top-level areas:
 
 - `bloc/`: feature-level control logic and feature state
-- `service/`: pure route/playback math
-- `infrastructure/`: platform and persistence adapters
+- `service/`: pure route/playback math plus infrastructure adapters
+- `model/`: shared data models
+- `ui/`: widget composition and screens
 
 The important architectural point is that the BLoC layer is the controller
 layer. There is no parallel controller stack anymore.
@@ -23,7 +24,7 @@ The current structure is meant to answer a simple question:
 - If it is feature control flow or feature state, it belongs in a BLoC.
 - If it is pure math with no side effects, it belongs in `service/`.
 - If it touches Android platform APIs or local storage, it belongs in
-  `infrastructure/`.
+  `service/infrastructure/`.
 - If it is widget composition or visual behavior, it belongs in `ui/`.
 
 That gives the repo a cleaner explanation than the previous
@@ -74,13 +75,13 @@ This is the shared source of truth for:
 - playback tick to next-progress resolution
 - route progress to interpolated map position
 
-### `infrastructure/`
+It also contains `service/infrastructure/` for adapter-style services:
 
 - `MockLocationGateway`
 - `PreferencesStore`
 
-These classes isolate the platform channel and local persistence details so the
-feature logic can stay testable.
+These classes isolate the platform channel and local persistence details under
+`service/infrastructure/` so the feature logic can stay testable.
 
 ### `ui/`
 

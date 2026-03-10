@@ -229,9 +229,9 @@ lib/
     settings/
   service/
     route_playback_math.dart
-  infrastructure/
-    mock_location_gateway.dart
-    preferences_store.dart
+    infrastructure/
+      mock_location_gateway.dart
+      preferences_store.dart
   model/
     help_section.dart
   ui/
@@ -263,9 +263,9 @@ Recommended target file:
 
 - `lib/service/route_playback_math.dart`
 
-### Infrastructure layer
+### Infrastructure adapters inside service
 
-Platform and persistence wrappers belong in `lib/infrastructure/`.
+Platform and persistence wrappers belong in `lib/service/infrastructure/`.
 
 Recommended renames:
 
@@ -299,18 +299,18 @@ they temporarily remain in the screen during the first mechanical refactor.
 - `lib/spoofer/coordinator/spoofer_runtime_coordinator.dart` ->
   `lib/service/route_playback_math.dart`
 - `lib/controllers/mock_location_controller.dart` ->
-  `lib/infrastructure/mock_location_gateway.dart`
+  `lib/service/infrastructure/mock_location_gateway.dart`
 - `lib/controllers/preferences_controller.dart` ->
-  `lib/infrastructure/preferences_store.dart`
+  `lib/service/infrastructure/preferences_store.dart`
 
 ### Import cleanup
 
 After the moves:
 
 - `lib/app.dart` imports should reference `lib/bloc/**` and
-  `lib/infrastructure/**`
-- `lib/ui/screens/spoofer_screen.dart` should import from `lib/bloc/**`,
-  `lib/service/**`, and `lib/infrastructure/**`
+  `lib/service/**`
+- `lib/ui/screens/spoofer_screen.dart` should import from `lib/bloc/**` and
+  `lib/service/**`
 - tests should import from the new top-level paths
 
 ## Behavior invariants for chunk 2

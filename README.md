@@ -73,7 +73,7 @@ For the full repo-side release checklist, see
 
 ## Architecture
 
-The app is split into `bloc/`, `service/`, and `infrastructure/` layers:
+The app is split into `bloc/`, `service/`, `model/`, and `ui/` layers:
 
 For a meeting-ready walkthrough of the ownership model, runtime flow, and
 verification story, see `docs/architecture-walkthrough.md`.
@@ -113,7 +113,7 @@ verification story, see `docs/architecture-walkthrough.md`.
     - playback tick -> next route progress (+ boundary handling)
     - route progress -> map position interpolation
 
-- Infrastructure adapters (non-BLoC):
+- Service infrastructure adapters (non-BLoC):
   - `MockLocationGateway`: Android platform channel bridge for mock location operations.
   - `PreferencesStore`: persistence for TOS and saved custom routes.
 

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../infrastructure/mock_location_gateway.dart';
+import '../../service/infrastructure/mock_location_gateway.dart';
 import '../widgets/search_scaffold.dart';
 
 class SearchScreen extends StatefulWidget {

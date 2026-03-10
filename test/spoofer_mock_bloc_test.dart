@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:voxtourai_gps_spoofer/bloc/mock/spoofer_mock_bloc.dart';
 import 'package:voxtourai_gps_spoofer/bloc/mock/spoofer_mock_event.dart';
 import 'package:voxtourai_gps_spoofer/bloc/mock/spoofer_mock_state.dart';
-import 'package:voxtourai_gps_spoofer/infrastructure/mock_location_gateway.dart';
+import 'package:voxtourai_gps_spoofer/service/infrastructure/mock_location_gateway.dart';
 
 void main() {
   group('SpooferMockBloc', () {

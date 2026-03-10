@@ -4,7 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../service/route_input_parser.dart';
 import '../../service/route_playback_math.dart';
-import '../../infrastructure/preferences_store.dart';
+import '../../service/infrastructure/preferences_store.dart';
 import '../../model/saved_route.dart';
 
 import 'spoofer_route_event.dart';

@@ -4,7 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_bloc.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_event.dart';
 import 'package:voxtourai_gps_spoofer/bloc/route/spoofer_route_state.dart';
-import 'package:voxtourai_gps_spoofer/infrastructure/preferences_store.dart';
+import 'package:voxtourai_gps_spoofer/service/infrastructure/preferences_store.dart';
 import 'package:voxtourai_gps_spoofer/model/saved_route.dart';
 
 const String _samplePolyline =

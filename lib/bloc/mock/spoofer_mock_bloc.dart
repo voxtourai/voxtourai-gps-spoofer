@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../infrastructure/mock_location_gateway.dart';
+import '../../service/infrastructure/mock_location_gateway.dart';
 
 import 'spoofer_mock_event.dart';
 import 'spoofer_mock_state.dart';

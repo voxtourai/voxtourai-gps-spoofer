@@ -13,8 +13,8 @@ import 'bloc/route/spoofer_route_event.dart';
 import 'bloc/settings/spoofer_settings_bloc.dart';
 import 'bloc/settings/spoofer_settings_state.dart';
 import 'service/route_playback_math.dart';
-import 'infrastructure/mock_location_gateway.dart';
-import 'infrastructure/preferences_store.dart';
+import 'service/infrastructure/mock_location_gateway.dart';
+import 'service/infrastructure/preferences_store.dart';
 import 'ui/screens/spoofer_screen.dart';
 
 class GpsSpooferAppDependencies {

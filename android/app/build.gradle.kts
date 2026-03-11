@@ -1,3 +1,4 @@
+import org.gradle.api.GradleException
 import java.util.Properties
 
 plugins {
@@ -78,10 +79,15 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        val mapsApiKey = (project.findProperty("MAPS_API_KEY") as String?)
-            ?: localProperties.getProperty("MAPS_API_KEY")
-            ?: System.getenv("MAPS_API_KEY")
-            ?: ""
+        val mapsApiKey = (
+            (project.findProperty("MAPS_API_KEY") as String?)
+                ?: localProperties.getProperty("MAPS_API_KEY")
+                ?: System.getenv("MAPS_API_KEY")
+            )?.takeIf { it.isNotBlank() }
+            ?: throw GradleException(
+                "MAPS_API_KEY is required. Set it in android/local.properties, " +
+                    "pass -PMAPS_API_KEY=..., or set the MAPS_API_KEY environment variable."
+            )
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 

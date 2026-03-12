@@ -13,7 +13,7 @@ resolve_secret() {
   local env_name="$1"
   local secret_name="$2"
   local env_value="${!env_name:-}"
-  local gcloud_project="${GOOGLE_CLOUD_PROJECT:-${GCLOUD_PROJECT:-}}"
+  local gcloud_project="${GOOGLE_CLOUD_PROJECT:-${GCLOUD_PROJECT:-voxtourai}}"
   local -a gcloud_args=()
 
   if [[ -n "${env_value}" ]]; then

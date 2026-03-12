@@ -20,8 +20,8 @@ Android‑first Flutter app for mocking GPS location along a route or custom way
    `./scripts/grab-platform-secrets.sh`
    The script uses `MAPS_API_KEY_ANDROID` from the environment first, then falls back to the
    `maps-api-key-android` secret through `gcloud`.
-   If `gcloud` does not already have a default project configured, set
-   `GOOGLE_CLOUD_PROJECT=...` (or `GCLOUD_PROJECT=...`) before running the script.
+   It defaults the `gcloud` project to `voxtourai`. Set `GOOGLE_CLOUD_PROJECT=...`
+   (or `GCLOUD_PROJECT=...`) before running the script if you need to override that.
    Or pass the key directly at build/run time:
    `MAPS_API_KEY=...`
 2. Connect a physical Android device with Developer Options and USB debugging enabled.

@@ -140,6 +140,7 @@ IntelliJ shared run configs live in `.run/`:
 - `Android Build`
 - `Build APK`
 - `Build App Bundle`
+- `Grab Platform Secrets`
 - `Grab Platform Secrets (WSL)`
 - `Flutter Analyze`
 - `Flutter Test All`

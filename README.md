@@ -137,8 +137,10 @@ verification story, see `docs/architecture-walkthrough.md`.
 
 IntelliJ shared run configs live in `.run/`:
 - `Main Local`
+- `Android Build`
 - `Build APK`
 - `Build App Bundle`
+- `Grab Platform Secrets (WSL)`
 - `Flutter Analyze`
 - `Flutter Test All`
 - `Route Bloc Tests`

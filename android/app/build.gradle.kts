@@ -8,13 +8,6 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val localProperties = Properties().apply {
-    val localPropsFile = rootProject.file("local.properties")
-    if (localPropsFile.exists()) {
-        localPropsFile.inputStream().use { load(it) }
-    }
-}
-
 val keystoreProperties = Properties().apply {
     val keystorePropsFile = rootProject.file("keystore.properties")
     if (keystorePropsFile.exists()) {
@@ -38,12 +31,10 @@ fun signingProperty(name: String, envName: String): String? {
         ?: fromEnv?.takeIf { it.isNotBlank() }
 }
 
-fun buildProperty(name: String, envName: String = name): String? {
+fun environmentProperty(name: String, envName: String = name): String? {
     val fromGradle = project.findProperty(name) as String?
-    val fromLocalProps = localProperties.getProperty(name)
     val fromEnv = System.getenv(envName)
     return fromGradle?.takeIf { it.isNotBlank() }
-        ?: fromLocalProps?.takeIf { it.isNotBlank() }
         ?: fromEnv?.takeIf { it.isNotBlank() }
 }
 
@@ -98,11 +89,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        val mapsApiKey = buildProperty("MAPS_API_KEY")
+        val mapsApiKey = environmentProperty("MAPS_API_KEY")
             ?: platformSecret("MAPS_API_KEY_ANDROID")
             ?: throw GradleException(
-                "MAPS_API_KEY is required. Set it in android/local.properties, " +
-                    "pass -PMAPS_API_KEY=..., set the MAPS_API_KEY environment variable, " +
+                "MAPS_API_KEY is required. Pass -PMAPS_API_KEY=..., set the MAPS_API_KEY " +
+                    "environment variable, " +
                     "or run ./scripts/grab-platform-secrets.sh to generate android/platform-secrets.properties."
             )
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey

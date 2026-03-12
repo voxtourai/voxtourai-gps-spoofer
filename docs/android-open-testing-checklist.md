@@ -17,7 +17,7 @@ For the boss-facing "what do we still need from people?" summary, see
 - Versioning already flows from `pubspec.yaml` into Android:
   - `versionName` -> Flutter build name
   - `versionCode` -> Flutter build number
-- The Google Maps API key is already wired through Gradle/local properties/env or
+- The Google Maps API key is already wired through Gradle/env or
   `android/platform-secrets.properties`:
   - `MAPS_API_KEY`
   - `MAPS_API_KEY_ANDROID`
@@ -91,7 +91,7 @@ flutter build appbundle --release
 
 Required local inputs:
 
-- `MAPS_API_KEY`
+- `MAPS_API_KEY`, or a generated `android/platform-secrets.properties`
 - release keystore config, if the output is intended for Play upload
 
 ## Ready Vs Blocked

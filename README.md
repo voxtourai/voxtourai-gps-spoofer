@@ -15,12 +15,13 @@ Android‑first Flutter app for mocking GPS location along a route or custom way
 - TOS gate on first run.
 
 ## Setup
-1. Set Google Maps key in `android/local.properties`:
-   `MAPS_API_KEY=...`
-   Or generate `android/platform-secrets.properties`:
+1. Resolve the Android Maps key:
+   Generate `android/platform-secrets.properties`:
    `./scripts/grab-platform-secrets.sh`
    The script uses `MAPS_API_KEY_ANDROID` from the environment first, then falls back to the
    `maps-api-key-android` secret through `gcloud`.
+   Or pass the key directly at build/run time:
+   `MAPS_API_KEY=...`
 2. Connect a physical Android device with Developer Options and USB debugging enabled.
 3. Install/run the app, then select it as the mock location app in Android Developer Options.
 
@@ -55,7 +56,7 @@ Commands should be executed from the project root.
 flutter build appbundle --release
 ```
 
-Build commands use the same `MAPS_API_KEY` sources as local runs.
+Build commands use the same Maps key sources as local runs.
 
 For Play-ready signing, configure `android/keystore.properties` from
 `android/keystore.properties.example`, or set the `ANDROID_KEYSTORE_*`

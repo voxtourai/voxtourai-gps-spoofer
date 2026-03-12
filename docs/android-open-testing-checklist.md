@@ -17,8 +17,10 @@ For the boss-facing "what do we still need from people?" summary, see
 - Versioning already flows from `pubspec.yaml` into Android:
   - `versionName` -> Flutter build name
   - `versionCode` -> Flutter build number
-- The Google Maps API key is already wired through Gradle/local properties/env:
+- The Google Maps API key is already wired through Gradle/local properties/env or
+  `android/platform-secrets.properties`:
   - `MAPS_API_KEY`
+  - `MAPS_API_KEY_ANDROID`
 - Shared IntelliJ run configs already exist for:
   - `Build APK`
   - `Build App Bundle`

@@ -47,3 +47,4 @@ app.*.map.json
 # Local secrets
 .env
 .env.local
+/android/platform-secrets.properties

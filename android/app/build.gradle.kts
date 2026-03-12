@@ -22,6 +22,13 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+val platformSecretsProperties = Properties().apply {
+    val platformSecretsFile = rootProject.file("platform-secrets.properties")
+    if (platformSecretsFile.exists()) {
+        platformSecretsFile.reader(Charsets.UTF_8).use { load(it) }
+    }
+}
+
 fun signingProperty(name: String, envName: String): String? {
     val fromGradle = project.findProperty(name) as String?
     val fromKeystoreFile = keystoreProperties.getProperty(name)
@@ -30,6 +37,18 @@ fun signingProperty(name: String, envName: String): String? {
         ?: fromKeystoreFile?.takeIf { it.isNotBlank() }
         ?: fromEnv?.takeIf { it.isNotBlank() }
 }
+
+fun buildProperty(name: String, envName: String = name): String? {
+    val fromGradle = project.findProperty(name) as String?
+    val fromLocalProps = localProperties.getProperty(name)
+    val fromEnv = System.getenv(envName)
+    return fromGradle?.takeIf { it.isNotBlank() }
+        ?: fromLocalProps?.takeIf { it.isNotBlank() }
+        ?: fromEnv?.takeIf { it.isNotBlank() }
+}
+
+fun platformSecret(name: String): String? =
+    platformSecretsProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
 
 val releaseStoreFile = signingProperty("storeFile", "ANDROID_KEYSTORE_FILE")
 val releaseStorePassword =
@@ -79,14 +98,12 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        val mapsApiKey = (
-            (project.findProperty("MAPS_API_KEY") as String?)
-                ?: localProperties.getProperty("MAPS_API_KEY")
-                ?: System.getenv("MAPS_API_KEY")
-            )?.takeIf { it.isNotBlank() }
+        val mapsApiKey = buildProperty("MAPS_API_KEY")
+            ?: platformSecret("MAPS_API_KEY_ANDROID")
             ?: throw GradleException(
                 "MAPS_API_KEY is required. Set it in android/local.properties, " +
-                    "pass -PMAPS_API_KEY=..., or set the MAPS_API_KEY environment variable."
+                    "pass -PMAPS_API_KEY=..., set the MAPS_API_KEY environment variable, " +
+                    "or run ./scripts/grab-platform-secrets.sh to generate android/platform-secrets.properties."
             )
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }

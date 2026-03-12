@@ -13,6 +13,8 @@ resolve_secret() {
   local env_name="$1"
   local secret_name="$2"
   local env_value="${!env_name:-}"
+  local gcloud_project="${GOOGLE_CLOUD_PROJECT:-${GCLOUD_PROJECT:-}}"
+  local -a gcloud_args=()
 
   if [[ -n "${env_value}" ]]; then
     printf '%s' "${env_value}"
@@ -20,7 +22,10 @@ resolve_secret() {
   fi
 
   if command -v gcloud >/dev/null 2>&1; then
-    gcloud secrets versions access latest --secret="${secret_name}"
+    if [[ -n "${gcloud_project}" ]]; then
+      gcloud_args+=(--project="${gcloud_project}")
+    fi
+    gcloud secrets versions access latest --secret="${secret_name}" "${gcloud_args[@]}"
     return
   fi
 

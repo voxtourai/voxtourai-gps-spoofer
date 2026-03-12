@@ -21,6 +21,7 @@ For the boss-facing "what do we still need from people?" summary, see
   `android/platform-secrets.properties`:
   - `MAPS_API_KEY`
   - `MAPS_API_KEY_ANDROID`
+  - optional `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT` for the secret-grab script
 - Shared IntelliJ run configs already exist for:
   - `Build APK`
   - `Build App Bundle`

@@ -2,6 +2,11 @@
 
 Android‑first Flutter app for mocking GPS location along a route or custom waypoints.
 
+## Public URLs
+
+- Site: `https://voxtourai.github.io/voxtourai-gps-spoofer/`
+- Privacy policy: `https://voxtourai.github.io/voxtourai-gps-spoofer/privacy-policy/`
+
 ## Features
 - Google Map view with route polyline and current mock marker.
 - Load route from encoded polyline or Google Routes API JSON (`routes[0].polyline.encodedPolyline`).

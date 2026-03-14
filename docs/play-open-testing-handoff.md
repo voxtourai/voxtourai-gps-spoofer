@@ -20,6 +20,7 @@ Relevant docs:
 
 - `docs/android-open-testing-checklist.md`
 - `docs/architecture-walkthrough.md`
+- `docs/android-play-store-default-listing.md`
 
 ## What You Need From Boss
 
@@ -32,10 +33,10 @@ These are the inputs that cannot be invented from the repo:
   - current launcher icon is still the default Flutter icon
 - Store screenshots:
   - at minimum, phone screenshots for the Play listing
-- Store copy:
-  - short description
-  - full description
-  - release notes style / tester-facing wording
+- Store copy approval:
+  - default draft now exists in `docs/android-play-store-default-listing.md`
+  - final short/full description still needs product review if wording must be adjusted
+  - release notes style / tester-facing wording is still needed
 - Support/contact details:
   - support email
   - support URL if one will be used
@@ -68,7 +69,8 @@ These steps cannot be completed from the repo alone:
 
 - current public app name is `GPS Spoofer`, but the launcher icon is still unfinished
 - launcher icon is still the default Flutter icon
-- store screenshots and listing copy do not exist in this repo
+- store screenshots do not exist in this repo
+- listing draft now exists in `docs/android-play-store-default-listing.md`, but it still needs approval and Play Console entry
 
 ### Account/process blockers
 
@@ -78,7 +80,7 @@ These steps cannot be completed from the repo alone:
 
 1. Get the upload keystore decision from your boss.
 2. Get or create the icon and listing screenshots.
-3. Get the short description, full description, and support details.
+3. Review the draft store listing in `docs/android-play-store-default-listing.md` and confirm support details.
 4. Add local signing credentials and build the final upload AAB.
 5. Hand the signed AAB plus listing inputs to whoever owns Play Console access.
 6. Create and roll out the open-testing release in Play Console.

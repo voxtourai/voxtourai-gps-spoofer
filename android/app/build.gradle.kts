@@ -103,9 +103,6 @@ android {
         release {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
-            } else {
-                // Keep local release builds working, but this output is not Play-uploadable.
-                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }

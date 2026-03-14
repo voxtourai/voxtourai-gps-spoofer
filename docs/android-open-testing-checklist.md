@@ -49,6 +49,7 @@ For the boss-facing "what do we still need from people?" summary, see
 Create `android/keystore.properties` from the example file:
 
 ```properties
+# This path resolves to android/app/.keystore/upload-keystore.jks
 storeFile=.keystore/upload-keystore.jks
 storePassword=...
 keyAlias=upload
@@ -66,13 +67,13 @@ $env:ANDROID_KEY_ALIAS = "upload"
 $env:ANDROID_KEY_PASSWORD = "..."
 ```
 
-### Fallback behavior
+### Fail-fast behavior
 
-If no release signing values are configured, the repo still falls back to the
-debug signing config for local `--release` builds.
+If release signing values are missing, Android `release` builds now fail during
+Gradle configuration with an explicit signing error.
 
-That fallback is useful for local smoke validation only.
-It is not acceptable for Google Play upload.
+Use a debug build or debug run for local smoke validation when you do not need
+a Play-uploadable artifact.
 
 ## Local Release Commands
 

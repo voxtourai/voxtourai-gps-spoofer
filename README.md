@@ -64,8 +64,8 @@ For Play-ready signing, configure `android/keystore.properties` from
 `android/keystore.properties.example`, or set the `ANDROID_KEYSTORE_*`
 environment variables before building.
 
-If no release signing values are configured, release builds fall back to debug
-signing for local smoke use only and are not uploadable to Google Play.
+Release APK/AAB builds now fail fast if release signing values are missing.
+Use a debug run for local smoke work that does not need a Play-uploadable artifact.
 
 For the full repo-side release checklist, see
 `docs/android-open-testing-checklist.md`.

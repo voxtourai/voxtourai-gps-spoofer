@@ -129,6 +129,25 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final actionButtons = <Widget>[
+      if (widget.pickFile != null)
+        OutlinedButton.icon(
+          onPressed: _pickingFile ? null : _pickFile,
+          icon: _pickingFile
+              ? const SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.upload_file_outlined),
+          label: Text(_pickingFile ? 'Loading...' : 'File'),
+        ),
+      TextButton(onPressed: _fillDemo, child: const Text('Demo')),
+      IconButton(
+        tooltip: 'Clear',
+        icon: const Icon(Icons.delete_outline),
+        onPressed: _clearInput,
+      ),
+    ];
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -187,31 +206,30 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
               ),
             ),
           ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: actionButtons,
+          ),
         ],
       ),
       actions: [
-        IconButton(
-          tooltip: 'Clear',
-          icon: const Icon(Icons.delete_outline),
-          onPressed: _clearInput,
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        if (widget.pickFile != null)
-          TextButton.icon(
-            onPressed: _pickingFile ? null : _pickFile,
-            icon: _pickingFile
-                ? const SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_file_outlined),
-            label: Text(_pickingFile ? 'Loading...' : 'File'),
+        SizedBox(
+          width: double.infinity,
+          child: Row(
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              const Spacer(),
+              FilledButton(onPressed: _submit, child: const Text('Load')),
+            ],
           ),
-        TextButton(onPressed: _fillDemo, child: const Text('Demo')),
-        FilledButton(onPressed: _submit, child: const Text('Load')),
+        ),
       ],
     );
   }

@@ -10,14 +10,13 @@ Future<void> showSpooferSettingsSideSheet({
   required BuildContext context,
   required SpooferSettingsState initialSettings,
   required SettingsBoolChanged onShowSetupBarChanged,
-  required SettingsBoolChanged onShowDebugPanelChanged,
   required SettingsBoolChanged onShowMockMarkerChanged,
   required SettingsDarkModeChanged onDarkModeChanged,
   required SettingsAsyncVoidCallback onDisableMockLocation,
   required SettingsAsyncVoidCallback onOpenDeveloperOptions,
   required SettingsAsyncVoidCallback onOpenPrivacyPolicy,
+  required SettingsAsyncVoidCallback onOpenDebugPanel,
   required VoidCallback onRunSetupChecks,
-  required WidgetBuilder debugPanelBuilder,
 }) async {
   await showGeneralDialog<void>(
     context: context,
@@ -28,14 +27,13 @@ Future<void> showSpooferSettingsSideSheet({
       return _SpooferSettingsSideSheet(
         initialSettings: initialSettings,
         onShowSetupBarChanged: onShowSetupBarChanged,
-        onShowDebugPanelChanged: onShowDebugPanelChanged,
         onShowMockMarkerChanged: onShowMockMarkerChanged,
         onDarkModeChanged: onDarkModeChanged,
         onDisableMockLocation: onDisableMockLocation,
         onOpenDeveloperOptions: onOpenDeveloperOptions,
         onOpenPrivacyPolicy: onOpenPrivacyPolicy,
+        onOpenDebugPanel: onOpenDebugPanel,
         onRunSetupChecks: onRunSetupChecks,
-        debugPanelBuilder: debugPanelBuilder,
       );
     },
     transitionBuilder: (context, anim, secondaryAnimation, child) {
@@ -52,26 +50,24 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
   const _SpooferSettingsSideSheet({
     required this.initialSettings,
     required this.onShowSetupBarChanged,
-    required this.onShowDebugPanelChanged,
     required this.onShowMockMarkerChanged,
     required this.onDarkModeChanged,
     required this.onDisableMockLocation,
     required this.onOpenDeveloperOptions,
     required this.onOpenPrivacyPolicy,
+    required this.onOpenDebugPanel,
     required this.onRunSetupChecks,
-    required this.debugPanelBuilder,
   });
 
   final SpooferSettingsState initialSettings;
   final SettingsBoolChanged onShowSetupBarChanged;
-  final SettingsBoolChanged onShowDebugPanelChanged;
   final SettingsBoolChanged onShowMockMarkerChanged;
   final SettingsDarkModeChanged onDarkModeChanged;
   final SettingsAsyncVoidCallback onDisableMockLocation;
   final SettingsAsyncVoidCallback onOpenDeveloperOptions;
   final SettingsAsyncVoidCallback onOpenPrivacyPolicy;
+  final SettingsAsyncVoidCallback onOpenDebugPanel;
   final VoidCallback onRunSetupChecks;
-  final WidgetBuilder debugPanelBuilder;
 
   @override
   State<_SpooferSettingsSideSheet> createState() =>
@@ -80,7 +76,6 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
 
 class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
   late bool _showSetupBar;
-  late bool _showDebugPanel;
   late bool _showMockMarker;
   late DarkModeSetting _darkModeSetting;
 
@@ -91,7 +86,6 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
     super.initState();
     final state = widget.initialSettings;
     _showSetupBar = state.showSetupBar;
-    _showDebugPanel = state.showDebugPanel;
     _showMockMarker = state.showMockMarker;
     _darkModeSetting = state.darkModeSetting;
   }
@@ -158,17 +152,6 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                       _showSetupBar = value;
                     });
                     widget.onShowSetupBarChanged(value);
-                  },
-                ),
-                _buildToggle(
-                  title: 'Show debug panel',
-                  value: _showDebugPanel,
-                  denseStyle: denseStyle,
-                  onChanged: (value) {
-                    setState(() {
-                      _showDebugPanel = value;
-                    });
-                    widget.onShowDebugPanelChanged(value);
                   },
                 ),
                 _buildToggle(
@@ -250,18 +233,21 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                   style: _actionButtonStyle(context),
                   onPressed: () async {
                     Navigator.of(context).pop();
+                    await widget.onOpenDebugPanel();
+                  },
+                  icon: const Icon(Icons.bug_report_outlined),
+                  label: const Text('Open debug panel'),
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  style: _actionButtonStyle(context),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
                     await widget.onOpenPrivacyPolicy();
                   },
                   icon: const Icon(Icons.privacy_tip_outlined),
                   label: const Text('Privacy policy'),
                 ),
-                if (_showDebugPanel) ...[
-                  const Divider(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: widget.debugPanelBuilder(context),
-                  ),
-                ],
               ],
             ),
           ),

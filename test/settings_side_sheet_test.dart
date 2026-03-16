@@ -19,15 +19,11 @@ void main() {
 
       await tester.tap(find.widgetWithText(ListTile, 'Show setup bar'));
       await tester.pump();
-      await tester.tap(find.widgetWithText(ListTile, 'Show debug panel'));
-      await tester.pump();
       await tester.tap(find.widgetWithText(ListTile, 'Show mocked marker'));
       await tester.pump();
 
       expect(harness.showSetupBarValues, <bool>[true]);
-      expect(harness.showDebugPanelValues, <bool>[true]);
       expect(harness.showMockMarkerValues, <bool>[true]);
-      expect(find.text('Debug panel body'), findsOneWidget);
     });
 
     testWidgets('dark mode dropdown invokes callback with selected value', (
@@ -59,7 +55,7 @@ void main() {
       await _pumpHost(
         tester,
         callbacks: harness,
-        initialSettings: const SpooferSettingsState(showDebugPanel: true),
+        initialSettings: const SpooferSettingsState(),
       );
 
       await _openSettingsSheet(tester);
@@ -116,17 +112,36 @@ void main() {
       expect(harness.openDeveloperOptionsCalls, 1);
       expect(find.text('Settings'), findsNothing);
     });
+
+    testWidgets('debug panel button invokes callback and closes sheet', (
+      tester,
+    ) async {
+      final harness = _SettingsSheetCallbacks();
+      await _pumpHost(
+        tester,
+        callbacks: harness,
+        initialSettings: const SpooferSettingsState(),
+      );
+
+      await _openSettingsSheet(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Open debug panel'));
+      await tester.pumpAndSettle();
+
+      expect(harness.openDebugPanelCalls, 1);
+      expect(find.text('Settings'), findsNothing);
+    });
   });
 }
 
 class _SettingsSheetCallbacks {
   final List<bool> showSetupBarValues = <bool>[];
-  final List<bool> showDebugPanelValues = <bool>[];
   final List<bool> showMockMarkerValues = <bool>[];
   final List<DarkModeSetting> darkModeValues = <DarkModeSetting>[];
   int disableMockLocationCalls = 0;
   int openDeveloperOptionsCalls = 0;
   int openPrivacyPolicyCalls = 0;
+  int openDebugPanelCalls = 0;
   int runSetupChecksCalls = 0;
 }
 
@@ -147,7 +162,6 @@ Future<void> _pumpHost(
                     context: context,
                     initialSettings: initialSettings,
                     onShowSetupBarChanged: callbacks.showSetupBarValues.add,
-                    onShowDebugPanelChanged: callbacks.showDebugPanelValues.add,
                     onShowMockMarkerChanged: callbacks.showMockMarkerValues.add,
                     onDarkModeChanged: callbacks.darkModeValues.add,
                     onDisableMockLocation: () async {
@@ -159,10 +173,12 @@ Future<void> _pumpHost(
                     onOpenPrivacyPolicy: () async {
                       callbacks.openPrivacyPolicyCalls += 1;
                     },
+                    onOpenDebugPanel: () async {
+                      callbacks.openDebugPanelCalls += 1;
+                    },
                     onRunSetupChecks: () {
                       callbacks.runSetupChecksCalls += 1;
                     },
-                    debugPanelBuilder: (_) => const Text('Debug panel body'),
                   );
                 },
                 child: const Text('Open settings'),

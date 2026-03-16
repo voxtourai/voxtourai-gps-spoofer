@@ -95,7 +95,22 @@ class MockLocationGateway {
     if (map == null) {
       return null;
     }
-    return map.map((key, value) => MapEntry(key.toString(), value));
+    return map.map(
+      (key, value) => MapEntry(key.toString(), _normalizeValue(value)),
+    );
+  }
+
+  Object? _normalizeValue(Object? value) {
+    if (value is Map) {
+      return value.map(
+        (key, nestedValue) =>
+            MapEntry(key.toString(), _normalizeValue(nestedValue)),
+      );
+    }
+    if (value is List) {
+      return value.map(_normalizeValue).toList(growable: false);
+    }
+    return value;
   }
 
   LatLng? _locationFromResult(Map<Object?, Object?>? result) {

@@ -915,14 +915,73 @@ class _SpooferScreenState extends State<SpooferScreen>
     );
   }
 
-  Widget _buildDebugPanel(BuildContext context, SpooferMockState mockState) {
-    return SpooferDebugPanel(
-      lastInjectedPosition: _mapState.lastInjectedPosition,
-      status: mockState.lastMockStatus,
-      isMockLocationApp: mockState.isMockLocationApp,
-      selectedMockApp: mockState.selectedMockApp,
-      debugLog: mockState.debugLog,
-      onRefreshMockStatus: _refreshMockAppStatus,
+  Future<void> _openDebugPanel() async {
+    if (!mounted) {
+      return;
+    }
+    final media = MediaQuery.sizeOf(context);
+    final dialogWidth = media.width > 560 ? 560.0 : media.width - 24;
+    final dialogHeight = media.height > 760 ? 760.0 : media.height - 48;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 24,
+          ),
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Debug panel',
+                        style: Theme.of(dialogContext).textTheme.titleMedium,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Close',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: BlocBuilder<SpooferMapBloc, SpooferMapState>(
+                      builder: (context, mapState) {
+                        return BlocBuilder<SpooferMockBloc, SpooferMockState>(
+                          builder: (context, mockState) {
+                            return SpooferDebugPanel(
+                              lastInjectedPosition:
+                                  mapState.lastInjectedPosition,
+                              status: mockState.lastMockStatus,
+                              isMockLocationApp: mockState.isMockLocationApp,
+                              selectedMockApp: mockState.selectedMockApp,
+                              debugLog: mockState.debugLog,
+                              onRefreshMockStatus: _refreshMockAppStatus,
+                              expanded: true,
+                              showTitle: false,
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1554,11 +1613,6 @@ class _SpooferScreenState extends State<SpooferScreen>
           SpooferSettingsShowSetupBarSetRequested(value: value),
         );
       },
-      onShowDebugPanelChanged: (value) {
-        _settingsBloc.add(
-          SpooferSettingsShowDebugPanelSetRequested(value: value),
-        );
-      },
       onShowMockMarkerChanged: (value) {
         _settingsBloc.add(
           SpooferSettingsShowMockMarkerSetRequested(value: value),
@@ -1569,13 +1623,8 @@ class _SpooferScreenState extends State<SpooferScreen>
       onDisableMockLocation: _disableMockLocationAndRecenter,
       onOpenDeveloperOptions: _openDeveloperOptions,
       onOpenPrivacyPolicy: _openPrivacyPolicy,
+      onOpenDebugPanel: _openDebugPanel,
       onRunSetupChecks: () => _requestStartupChecks(showDialogs: true),
-      debugPanelBuilder: (context) {
-        return _buildDebugPanel(
-          context,
-          context.watch<SpooferMockBloc>().state,
-        );
-      },
     );
   }
 

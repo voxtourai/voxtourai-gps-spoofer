@@ -1517,6 +1517,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       },
       onDarkModeChanged: _applyDarkModeSetting,
       onDisableMockLocation: _disableMockLocationAndRecenter,
+      onOpenDeveloperOptions: _openDeveloperOptions,
       onOpenPrivacyPolicy: _openPrivacyPolicy,
       onRunSetupChecks: () => _requestStartupChecks(showDialogs: true),
       debugPanelBuilder: (context) {
@@ -1526,6 +1527,14 @@ class _SpooferScreenState extends State<SpooferScreen>
         );
       },
     );
+  }
+
+  Future<void> _openDeveloperOptions() async {
+    try {
+      await widget.mockGateway.openDeveloperSettings();
+    } on PlatformException {
+      _showUiSnack('Failed to open developer options.');
+    }
   }
 
   Future<void> _openPrivacyPolicy() async {

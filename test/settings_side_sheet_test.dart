@@ -95,6 +95,27 @@ void main() {
       expect(harness.openPrivacyPolicyCalls, 1);
       expect(find.text('Settings'), findsNothing);
     });
+
+    testWidgets('developer options button invokes callback and closes sheet', (
+      tester,
+    ) async {
+      final harness = _SettingsSheetCallbacks();
+      await _pumpHost(
+        tester,
+        callbacks: harness,
+        initialSettings: const SpooferSettingsState(),
+      );
+
+      await _openSettingsSheet(tester);
+
+      await tester.tap(
+        find.widgetWithText(OutlinedButton, 'Open developer options'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(harness.openDeveloperOptionsCalls, 1);
+      expect(find.text('Settings'), findsNothing);
+    });
   });
 }
 
@@ -104,6 +125,7 @@ class _SettingsSheetCallbacks {
   final List<bool> showMockMarkerValues = <bool>[];
   final List<DarkModeSetting> darkModeValues = <DarkModeSetting>[];
   int disableMockLocationCalls = 0;
+  int openDeveloperOptionsCalls = 0;
   int openPrivacyPolicyCalls = 0;
   int runSetupChecksCalls = 0;
 }
@@ -130,6 +152,9 @@ Future<void> _pumpHost(
                     onDarkModeChanged: callbacks.darkModeValues.add,
                     onDisableMockLocation: () async {
                       callbacks.disableMockLocationCalls += 1;
+                    },
+                    onOpenDeveloperOptions: () async {
+                      callbacks.openDeveloperOptionsCalls += 1;
                     },
                     onOpenPrivacyPolicy: () async {
                       callbacks.openPrivacyPolicyCalls += 1;

@@ -14,6 +14,7 @@ Future<void> showSpooferSettingsSideSheet({
   required SettingsBoolChanged onShowMockMarkerChanged,
   required SettingsDarkModeChanged onDarkModeChanged,
   required SettingsAsyncVoidCallback onDisableMockLocation,
+  required SettingsAsyncVoidCallback onOpenDeveloperOptions,
   required SettingsAsyncVoidCallback onOpenPrivacyPolicy,
   required VoidCallback onRunSetupChecks,
   required WidgetBuilder debugPanelBuilder,
@@ -31,6 +32,7 @@ Future<void> showSpooferSettingsSideSheet({
         onShowMockMarkerChanged: onShowMockMarkerChanged,
         onDarkModeChanged: onDarkModeChanged,
         onDisableMockLocation: onDisableMockLocation,
+        onOpenDeveloperOptions: onOpenDeveloperOptions,
         onOpenPrivacyPolicy: onOpenPrivacyPolicy,
         onRunSetupChecks: onRunSetupChecks,
         debugPanelBuilder: debugPanelBuilder,
@@ -54,6 +56,7 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
     required this.onShowMockMarkerChanged,
     required this.onDarkModeChanged,
     required this.onDisableMockLocation,
+    required this.onOpenDeveloperOptions,
     required this.onOpenPrivacyPolicy,
     required this.onRunSetupChecks,
     required this.debugPanelBuilder,
@@ -65,6 +68,7 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
   final SettingsBoolChanged onShowMockMarkerChanged;
   final SettingsDarkModeChanged onDarkModeChanged;
   final SettingsAsyncVoidCallback onDisableMockLocation;
+  final SettingsAsyncVoidCallback onOpenDeveloperOptions;
   final SettingsAsyncVoidCallback onOpenPrivacyPolicy;
   final VoidCallback onRunSetupChecks;
   final WidgetBuilder debugPanelBuilder;
@@ -229,6 +233,23 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                   },
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text('Run setup checks'),
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: _compactDensity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    textStyle: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await widget.onOpenDeveloperOptions();
+                  },
+                  icon: const Icon(Icons.developer_mode_outlined),
+                  label: const Text('Open developer options'),
                 ),
                 const SizedBox(height: 6),
                 OutlinedButton.icon(

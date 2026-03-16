@@ -68,6 +68,27 @@ void main() {
       expect(demoTapped, 1);
     });
 
+    testWidgets('file import fills the input and shows the loaded file name', (
+      tester,
+    ) async {
+      await _pumpDialog(
+        tester,
+        initialValue: '',
+        sampleRoute: 'demo_polyline',
+        pickFile: () async => const RouteInputPickedFile(
+          text: '{"routes":[{"polyline":{"encodedPolyline":"abc"}}]}',
+          name: 'route.json',
+        ),
+      );
+
+      await tester.tap(find.text('File'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Loaded file: route.json'), findsOneWidget);
+      expect(find.text('Polyline detected.'), findsOneWidget);
+    });
+
     testWidgets('clear button removes input and resets validation state', (
       tester,
     ) async {
@@ -93,6 +114,7 @@ Future<void> _pumpDialog(
   required String initialValue,
   required String sampleRoute,
   VoidCallback? onDemoFilled,
+  RouteInputFilePicker? pickFile,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -102,6 +124,7 @@ Future<void> _pumpDialog(
           sampleRoute: sampleRoute,
           detectPolyline: extractPolylineFromInput,
           onDemoFilled: onDemoFilled,
+          pickFile: pickFile,
         ),
       ),
     ),

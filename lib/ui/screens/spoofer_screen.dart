@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -686,6 +688,7 @@ class _SpooferScreenState extends State<SpooferScreen>
         sampleRoute: _samplePolyline,
         detectPolyline: extractPolylineFromInput,
         onDemoFilled: () => _showUiOverlay('Filled demo route.'),
+        pickFile: _pickRouteFile,
       ),
     );
     if (input == null) {
@@ -699,6 +702,39 @@ class _SpooferScreenState extends State<SpooferScreen>
     context.read<SpooferMockBloc>().add(
       const SpooferMockClearLocationRequested(),
     );
+  }
+
+  Future<RouteInputPickedFile?> _pickRouteFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        return null;
+      }
+
+      final file = result.files.single;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showUiSnack('Unable to read file contents.');
+        return null;
+      }
+
+      final text = utf8.decode(bytes, allowMalformed: true).trim();
+      if (text.isEmpty) {
+        _showUiSnack('Selected file is empty.');
+        return null;
+      }
+
+      return RouteInputPickedFile(text: text, name: file.name);
+    } on PlatformException catch (error) {
+      _showUiSnack('Failed to load file: ${error.message ?? error.code}');
+      return null;
+    } catch (error) {
+      _showUiSnack('Failed to load file: $error');
+      return null;
+    }
   }
 
   Future<LatLng?> _getRealLocation() async {

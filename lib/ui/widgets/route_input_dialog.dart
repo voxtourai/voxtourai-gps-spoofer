@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 
 typedef PolylineDetector = String? Function(String input);
+typedef RouteInputFilePicker = Future<RouteInputPickedFile?> Function();
+
+class RouteInputPickedFile {
+  const RouteInputPickedFile({required this.text, this.name});
+
+  final String text;
+  final String? name;
+}
 
 class RouteInputDialog extends StatefulWidget {
   const RouteInputDialog({
@@ -9,12 +17,14 @@ class RouteInputDialog extends StatefulWidget {
     required this.sampleRoute,
     required this.detectPolyline,
     this.onDemoFilled,
+    this.pickFile,
   });
 
   final String initialValue;
   final String sampleRoute;
   final PolylineDetector detectPolyline;
   final VoidCallback? onDemoFilled;
+  final RouteInputFilePicker? pickFile;
 
   @override
   State<RouteInputDialog> createState() => _RouteInputDialogState();
@@ -24,6 +34,8 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
   late final TextEditingController _controller;
   String? _detectedPolyline;
   bool _showEmptyError = false;
+  bool _pickingFile = false;
+  String? _loadedFileName;
 
   bool get _isEmpty => _controller.text.trim().isEmpty;
 
@@ -66,7 +78,42 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
     _controller.selection = TextSelection.collapsed(
       offset: _controller.text.length,
     );
+    setState(() {
+      _loadedFileName = null;
+    });
     widget.onDemoFilled?.call();
+  }
+
+  Future<void> _pickFile() async {
+    final pickFile = widget.pickFile;
+    if (pickFile == null || _pickingFile) {
+      return;
+    }
+
+    setState(() {
+      _pickingFile = true;
+    });
+
+    try {
+      final result = await pickFile();
+      if (!mounted || result == null) {
+        return;
+      }
+      _controller.text = result.text;
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+      setState(() {
+        _showEmptyError = false;
+        _loadedFileName = result.name;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pickingFile = false;
+        });
+      }
+    }
   }
 
   void _submit() {
@@ -128,6 +175,18 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
               ),
             ),
           ],
+          if (_loadedFileName != null) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Loaded file: $_loadedFileName',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -140,6 +199,17 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
+        if (widget.pickFile != null)
+          TextButton.icon(
+            onPressed: _pickingFile ? null : _pickFile,
+            icon: _pickingFile
+                ? const SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            label: Text(_pickingFile ? 'Loading...' : 'File'),
+          ),
         TextButton(onPressed: _fillDemo, child: const Text('Demo')),
         FilledButton(onPressed: _submit, child: const Text('Load')),
       ],

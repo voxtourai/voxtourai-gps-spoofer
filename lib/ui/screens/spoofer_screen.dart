@@ -165,7 +165,8 @@ class _SpooferScreenState extends State<SpooferScreen>
     final playbackBloc = context.read<SpooferPlaybackBloc>();
     if (state == AppLifecycleState.resumed) {
       playbackBloc.add(const SpooferPlaybackAppResumed());
-    } else {
+    } else if (state == AppLifecycleState.detached ||
+        !_settingsState.backgroundEnabled) {
       playbackBloc.add(const SpooferPlaybackAppPaused());
     }
     if (widget.launchOptions.manageBackgroundNotifications) {
@@ -937,6 +938,9 @@ class _SpooferScreenState extends State<SpooferScreen>
           androidConfig: _backgroundConfig,
         );
         if (!initialized) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           if (showFeedback) {
             _showUiSnack(
               'Please disable battery optimizations to enable background mode.',
@@ -946,6 +950,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         }
         final hasPermissions = await FlutterBackground.hasPermissions;
         if (!hasPermissions) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           if (showFeedback) {
             _showUiSnack(
               'Background permissions not granted. Disable battery optimizations and retry.',
@@ -955,6 +962,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         }
         final success = await FlutterBackground.enableBackgroundExecution();
         if (!success) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           if (showFeedback) {
             _showUiSnack('Failed to enable background mode.');
           }
@@ -979,6 +989,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         return true;
       }
     } catch (error) {
+      _settingsBloc.add(
+        const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+      );
       if (showFeedback) {
         _showUiSnack('Background mode error: $error');
       }

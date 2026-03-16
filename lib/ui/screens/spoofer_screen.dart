@@ -552,8 +552,13 @@ class _SpooferScreenState extends State<SpooferScreen>
                           onTogglePlayback: hasRoute ? _togglePlayback : null,
                           onOpenWaypoints: _openWaypointList,
                           onFitRoute: () {
-                            _fitRouteToMap();
-                            _showUiOverlay('Map fit to route');
+                            final wasAutoFollow = mapState.autoFollowEnabled;
+                            _fitRouteToMap(disableAutoFollow: true);
+                            _showUiOverlay(
+                              wasAutoFollow
+                                  ? 'Map fit to route · auto-follow off'
+                                  : 'Map fit to route',
+                            );
                           },
                           onRecenter: () {
                             final currentPosition = mapState.currentPosition;
@@ -1406,7 +1411,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     _mapController!.moveCamera(CameraUpdate.newLatLng(position));
   }
 
-  void _fitRouteToMap() {
+  void _fitRouteToMap({bool disableAutoFollow = false}) {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (_mapController == null) {
       _setMapPendingFitRoute(true);
@@ -1415,7 +1420,11 @@ class _SpooferScreenState extends State<SpooferScreen>
     if (!routeState.hasPoints) {
       return;
     }
+    if (disableAutoFollow && _mapState.autoFollowEnabled) {
+      _setMapAutoFollow(false);
+    }
     _setMapPendingFitRoute(false);
+    _setMapProgrammaticMove(true);
 
     if (routeState.routePoints.length == 1) {
       _mapController!.moveCamera(

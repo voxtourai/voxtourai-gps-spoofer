@@ -688,6 +688,12 @@ class _SpooferScreenState extends State<SpooferScreen>
         sampleRoute: _samplePolyline,
         detectPolyline: extractPolylineFromInput,
         onDemoFilled: () => _showUiOverlay('Filled demo route.'),
+        onFileLoaded: (fileName) {
+          final label = fileName == null || fileName.isEmpty
+              ? 'Loaded route file.'
+              : 'Loaded file: $fileName';
+          _showUiOverlay(label);
+        },
         pickFile: _pickRouteFile,
       ),
     );

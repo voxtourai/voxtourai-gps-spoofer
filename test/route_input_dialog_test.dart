@@ -68,26 +68,31 @@ void main() {
       expect(demoTapped, 1);
     });
 
-    testWidgets('file import fills the input and shows the loaded file name', (
-      tester,
-    ) async {
-      await _pumpDialog(
-        tester,
-        initialValue: '',
-        sampleRoute: 'demo_polyline',
-        pickFile: () async => const RouteInputPickedFile(
-          text: '{"routes":[{"polyline":{"encodedPolyline":"abc"}}]}',
-          name: 'route.json',
-        ),
-      );
+    testWidgets(
+      'file import fills the input and reports the loaded file name',
+      (tester) async {
+        String? loadedFileName;
+        await _pumpDialog(
+          tester,
+          initialValue: '',
+          sampleRoute: 'demo_polyline',
+          onFileLoaded: (name) {
+            loadedFileName = name;
+          },
+          pickFile: () async => const RouteInputPickedFile(
+            text: '{"routes":[{"polyline":{"encodedPolyline":"abc"}}]}',
+            name: 'route.json',
+          ),
+        );
 
-      await tester.tap(find.text('File'));
-      await tester.pump();
-      await tester.pump();
+        await tester.tap(find.text('File'));
+        await tester.pump();
+        await tester.pump();
 
-      expect(find.text('Loaded file: route.json'), findsOneWidget);
-      expect(find.text('Polyline detected.'), findsOneWidget);
-    });
+        expect(find.text('Polyline detected.'), findsOneWidget);
+        expect(loadedFileName, 'route.json');
+      },
+    );
 
     testWidgets('clear button removes input and resets validation state', (
       tester,
@@ -114,6 +119,7 @@ Future<void> _pumpDialog(
   required String initialValue,
   required String sampleRoute,
   VoidCallback? onDemoFilled,
+  RouteInputFileLoaded? onFileLoaded,
   RouteInputFilePicker? pickFile,
 }) async {
   await tester.pumpWidget(
@@ -124,6 +130,7 @@ Future<void> _pumpDialog(
           sampleRoute: sampleRoute,
           detectPolyline: extractPolylineFromInput,
           onDemoFilled: onDemoFilled,
+          onFileLoaded: onFileLoaded,
           pickFile: pickFile,
         ),
       ),

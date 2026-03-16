@@ -5,18 +5,28 @@ import 'package:voxtourai_gps_spoofer/ui/widgets/route_input_dialog.dart';
 
 void main() {
   group('RouteInputDialog', () {
-    testWidgets('shows required message and disables load when empty', (
-      tester,
-    ) async {
-      await _pumpDialog(tester, initialValue: '', sampleRoute: 'demo_polyline');
+    testWidgets(
+      'opens clean and only shows required message after load click',
+      (tester) async {
+        await _pumpDialog(
+          tester,
+          initialValue: '',
+          sampleRoute: 'demo_polyline',
+        );
 
-      expect(find.text('Input required to load a route.'), findsOneWidget);
+        expect(find.text('Input required to load a route.'), findsNothing);
 
-      final loadButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Load'),
-      );
-      expect(loadButton.onPressed, isNull);
-    });
+        final loadButton = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Load'),
+        );
+        expect(loadButton.onPressed, isNotNull);
+
+        await tester.tap(find.widgetWithText(FilledButton, 'Load'));
+        await tester.pump();
+
+        expect(find.text('Input required to load a route.'), findsOneWidget);
+      },
+    );
 
     testWidgets('shows polyline detected when parser resolves input', (
       tester,
@@ -58,23 +68,22 @@ void main() {
       expect(demoTapped, 1);
     });
 
-    testWidgets('clear button removes input and disables load again', (
+    testWidgets('clear button removes input and resets validation state', (
       tester,
     ) async {
-      await _pumpDialog(
-        tester,
-        initialValue: 'prefilled_polyline',
-        sampleRoute: 'demo_polyline',
-      );
+      await _pumpDialog(tester, initialValue: '', sampleRoute: 'demo_polyline');
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Load'));
+      await tester.pump();
 
       await tester.tap(find.byTooltip('Clear'));
       await tester.pump();
 
-      expect(find.text('Input required to load a route.'), findsOneWidget);
+      expect(find.text('Input required to load a route.'), findsNothing);
       final loadButton = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, 'Load'),
       );
-      expect(loadButton.onPressed, isNull);
+      expect(loadButton.onPressed, isNotNull);
     });
   });
 }

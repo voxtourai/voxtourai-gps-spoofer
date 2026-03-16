@@ -109,6 +109,14 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
     }
   }
 
+  ButtonStyle _actionButtonStyle(BuildContext context) {
+    return OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(44),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      textStyle: Theme.of(context).textTheme.bodyMedium,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final denseStyle = Theme.of(context).textTheme.bodySmall;
@@ -205,14 +213,7 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                 ),
                 const Divider(height: 16),
                 OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: _compactDensity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    textStyle: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  style: _actionButtonStyle(context),
                   onPressed: widget.onDisableMockLocation,
                   icon: const Icon(Icons.location_off),
                   label: const Text('Disable mock location'),
@@ -220,12 +221,12 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                 const SizedBox(height: 6),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    visualDensity: _compactDensity,
+                    minimumSize: const Size.fromHeight(44),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
+                      horizontal: 14,
+                      vertical: 12,
                     ),
-                    textStyle: Theme.of(context).textTheme.bodySmall,
+                    textStyle: Theme.of(context).textTheme.bodyMedium,
                   ),
                   onPressed: () {
                     Navigator.of(context).pop();
@@ -236,14 +237,7 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                 ),
                 const SizedBox(height: 6),
                 OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: _compactDensity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    textStyle: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  style: _actionButtonStyle(context),
                   onPressed: () async {
                     Navigator.of(context).pop();
                     await widget.onOpenDeveloperOptions();
@@ -253,14 +247,7 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                 ),
                 const SizedBox(height: 6),
                 OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    visualDensity: _compactDensity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    textStyle: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  style: _actionButtonStyle(context),
                   onPressed: () async {
                     Navigator.of(context).pop();
                     await widget.onOpenPrivacyPolicy();

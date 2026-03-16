@@ -133,6 +133,11 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
       visualDensity: VisualDensity.compact,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     );
+    final primaryButtonStyle = FilledButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      minimumSize: const Size(0, 36),
+    );
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -237,21 +242,16 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
                 icon: const Icon(Icons.delete_outline),
                 onPressed: _clearInput,
               ),
+              FilledButton(
+                style: primaryButtonStyle,
+                onPressed: _submit,
+                child: const Text('Load'),
+              ),
             ],
           ),
         ],
       ),
-      actions: [
-        SizedBox(
-          width: double.infinity,
-          child: Row(
-            children: [
-              const Spacer(),
-              FilledButton(onPressed: _submit, child: const Text('Load')),
-            ],
-          ),
-        ),
-      ],
+      actions: const [],
     );
   }
 }

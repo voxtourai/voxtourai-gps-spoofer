@@ -222,15 +222,16 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
           Row(
             children: [
               SizedBox(
-                width: 32,
-                height: 40,
+                width: 28,
+                height: 36,
                 child: IconButton(
                   tooltip: 'Clear',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints.tightFor(
-                    width: 32,
-                    height: 40,
+                    width: 28,
+                    height: 36,
                   ),
+                  splashRadius: 16,
                   icon: const Icon(Icons.delete_outline),
                   onPressed: _clearInput,
                 ),

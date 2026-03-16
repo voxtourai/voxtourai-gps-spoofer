@@ -129,6 +129,9 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final media = MediaQuery.sizeOf(context);
+    final viewInsets = MediaQuery.viewInsetsOf(context);
+    final maxDialogHeight = media.height - viewInsets.bottom - 40;
     const actionGap = 6.0;
     final utilityButtonStyle = TextButton.styleFrom(
       visualDensity: VisualDensity.compact,
@@ -148,143 +151,158 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
       minimumSize: const Size(0, 38),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
-    return AlertDialog(
+    return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-      actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Load route',
-              style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
-            ),
-          ),
-          IconButton(
-            tooltip: 'Close',
-            icon: const Icon(Icons.close),
-            splashRadius: 18,
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _controller,
-            minLines: 3,
-            maxLines: 6,
-            decoration: const InputDecoration(
-              hintText: 'Paste encoded polyline or Routes API JSON',
-              border: OutlineInputBorder(),
-              isDense: true,
-              contentPadding: EdgeInsets.fromLTRB(12, 10, 12, 10),
-            ),
-          ),
-          if (_showEmptyError) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Input required to load a route.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ),
-          ] else if (_detectedPolyline != null) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Polyline detected.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ),
-          ],
-          if (_loadedFileName != null) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Loaded file: $_loadedFileName',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.secondary,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              SizedBox(
-                width: 24,
-                height: 36,
-                child: IconButton(
-                  tooltip: 'Clear',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 24,
-                    height: 36,
-                  ),
-                  splashRadius: 16,
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: _clearInput,
-                ),
-              ),
-              const SizedBox(width: actionGap),
-              Expanded(
-                child: TextButton.icon(
-                  style: utilityButtonStyle,
-                  onPressed: _fillDemo,
-                  icon: const Icon(Icons.bolt_outlined, size: 14),
-                  label: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text('Demo', softWrap: false),
-                  ),
-                ),
-              ),
-              if (widget.pickFile != null) const SizedBox(width: actionGap),
-              if (widget.pickFile != null)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: outlinedUtilityButtonStyle,
-                    onPressed: _pickingFile ? null : _pickFile,
-                    icon: _pickingFile
-                        ? const SizedBox.square(
-                            dimension: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.upload_file_outlined, size: 14),
-                    label: FittedBox(
-                      fit: BoxFit.scaleDown,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 420,
+          maxHeight: maxDialogHeight < 240 ? 240 : maxDialogHeight,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
                       child: Text(
-                        _pickingFile ? 'Loading...' : 'File',
-                        softWrap: false,
+                        'Load route',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      icon: const Icon(Icons.close),
+                      splashRadius: 18,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                TextField(
+                  controller: _controller,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    hintText: 'Paste encoded polyline or Routes API JSON',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  ),
+                ),
+                if (_showEmptyError) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Input required to load a route.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
                       ),
                     ),
                   ),
-                ),
-              const SizedBox(width: actionGap),
-              Expanded(
-                child: FilledButton(
-                  style: primaryButtonStyle,
-                  onPressed: _submit,
-                  child: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text('Load', softWrap: false),
+                ] else if (_detectedPolyline != null) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Polyline detected.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                   ),
+                ],
+                if (_loadedFileName != null) ...[
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Loaded file: $_loadedFileName',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 36,
+                      child: IconButton(
+                        tooltip: 'Clear',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 24,
+                          height: 36,
+                        ),
+                        splashRadius: 16,
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: _clearInput,
+                      ),
+                    ),
+                    const SizedBox(width: actionGap),
+                    Expanded(
+                      child: TextButton.icon(
+                        style: utilityButtonStyle,
+                        onPressed: _fillDemo,
+                        icon: const Icon(Icons.bolt_outlined, size: 14),
+                        label: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Demo', softWrap: false),
+                        ),
+                      ),
+                    ),
+                    if (widget.pickFile != null)
+                      const SizedBox(width: actionGap),
+                    if (widget.pickFile != null)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: outlinedUtilityButtonStyle,
+                          onPressed: _pickingFile ? null : _pickFile,
+                          icon: _pickingFile
+                              ? const SizedBox.square(
+                                  dimension: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.upload_file_outlined,
+                                  size: 14,
+                                ),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _pickingFile ? 'Loading...' : 'File',
+                              softWrap: false,
+                            ),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: actionGap),
+                    Expanded(
+                      child: FilledButton(
+                        style: primaryButtonStyle,
+                        onPressed: _submit,
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('Load', softWrap: false),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
-      actions: const [],
     );
   }
 }

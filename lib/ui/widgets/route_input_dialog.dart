@@ -129,25 +129,10 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final actionButtons = <Widget>[
-      if (widget.pickFile != null)
-        OutlinedButton.icon(
-          onPressed: _pickingFile ? null : _pickFile,
-          icon: _pickingFile
-              ? const SizedBox.square(
-                  dimension: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.upload_file_outlined),
-          label: Text(_pickingFile ? 'Loading...' : 'File'),
-        ),
-      TextButton(onPressed: _fillDemo, child: const Text('Demo')),
-      IconButton(
-        tooltip: 'Clear',
-        icon: const Icon(Icons.delete_outline),
-        onPressed: _clearInput,
-      ),
-    ];
+    final utilityButtonStyle = TextButton.styleFrom(
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    );
     return AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -207,12 +192,40 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
             ),
           ],
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: actionButtons,
+          Row(
+            children: [
+              if (widget.pickFile != null)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                  onPressed: _pickingFile ? null : _pickFile,
+                  icon: _pickingFile
+                      ? const SizedBox.square(
+                          dimension: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.upload_file_outlined),
+                  label: Text(_pickingFile ? 'Loading...' : 'File'),
+                ),
+              if (widget.pickFile != null) const SizedBox(width: 4),
+              TextButton.icon(
+                style: utilityButtonStyle,
+                onPressed: _fillDemo,
+                icon: const Icon(Icons.bolt_outlined),
+                label: const Text('Demo'),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Clear',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _clearInput,
+              ),
+            ],
           ),
         ],
       ),

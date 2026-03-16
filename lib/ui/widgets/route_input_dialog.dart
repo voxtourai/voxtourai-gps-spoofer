@@ -211,6 +211,17 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
           const SizedBox(height: 10),
           Row(
             children: [
+              IconButton(
+                tooltip: 'Clear',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _clearInput,
+              ),
+              TextButton.icon(
+                style: utilityButtonStyle,
+                onPressed: _fillDemo,
+                icon: const Icon(Icons.bolt_outlined),
+                label: const Text('Demo'),
+              ),
               if (widget.pickFile != null)
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
@@ -229,19 +240,6 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
                       : const Icon(Icons.upload_file_outlined),
                   label: Text(_pickingFile ? 'Loading...' : 'File'),
                 ),
-              if (widget.pickFile != null) const SizedBox(width: 4),
-              TextButton.icon(
-                style: utilityButtonStyle,
-                onPressed: _fillDemo,
-                icon: const Icon(Icons.bolt_outlined),
-                label: const Text('Demo'),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Clear',
-                icon: const Icon(Icons.delete_outline),
-                onPressed: _clearInput,
-              ),
               FilledButton(
                 style: primaryButtonStyle,
                 onPressed: _submit,

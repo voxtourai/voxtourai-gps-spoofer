@@ -138,9 +138,21 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
       titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
       actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      title: Text(
-        'Load route',
-        style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Load route',
+              style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Close',
+            icon: const Icon(Icons.close),
+            splashRadius: 18,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -234,10 +246,6 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
           width: double.infinity,
           child: Row(
             children: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
               const Spacer(),
               FilledButton(onPressed: _submit, child: const Text('Load')),
             ],

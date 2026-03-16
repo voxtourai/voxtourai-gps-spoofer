@@ -52,6 +52,8 @@ import 'search_screen.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
+const String _privacyPolicyUrl =
+    'https://support.voxtour.ai/voxtourai-gps-spoofer/privacy-policy/';
 
 class SpooferScreen extends StatefulWidget {
   SpooferScreen({
@@ -1515,6 +1517,7 @@ class _SpooferScreenState extends State<SpooferScreen>
       },
       onDarkModeChanged: _applyDarkModeSetting,
       onDisableMockLocation: _disableMockLocationAndRecenter,
+      onOpenPrivacyPolicy: _openPrivacyPolicy,
       onRunSetupChecks: () => _requestStartupChecks(showDialogs: true),
       debugPanelBuilder: (context) {
         return _buildDebugPanel(
@@ -1523,6 +1526,14 @@ class _SpooferScreenState extends State<SpooferScreen>
         );
       },
     );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    try {
+      await widget.mockGateway.openExternalUrl(_privacyPolicyUrl);
+    } on PlatformException {
+      _showUiSnack('Failed to open privacy policy.');
+    }
   }
 
   Future<void> _openHelpScreen() async {

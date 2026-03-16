@@ -14,6 +14,7 @@ Future<void> showSpooferSettingsSideSheet({
   required SettingsBoolChanged onShowMockMarkerChanged,
   required SettingsDarkModeChanged onDarkModeChanged,
   required SettingsAsyncVoidCallback onDisableMockLocation,
+  required SettingsAsyncVoidCallback onOpenPrivacyPolicy,
   required VoidCallback onRunSetupChecks,
   required WidgetBuilder debugPanelBuilder,
 }) async {
@@ -30,6 +31,7 @@ Future<void> showSpooferSettingsSideSheet({
         onShowMockMarkerChanged: onShowMockMarkerChanged,
         onDarkModeChanged: onDarkModeChanged,
         onDisableMockLocation: onDisableMockLocation,
+        onOpenPrivacyPolicy: onOpenPrivacyPolicy,
         onRunSetupChecks: onRunSetupChecks,
         debugPanelBuilder: debugPanelBuilder,
       );
@@ -52,6 +54,7 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
     required this.onShowMockMarkerChanged,
     required this.onDarkModeChanged,
     required this.onDisableMockLocation,
+    required this.onOpenPrivacyPolicy,
     required this.onRunSetupChecks,
     required this.debugPanelBuilder,
   });
@@ -62,6 +65,7 @@ class _SpooferSettingsSideSheet extends StatefulWidget {
   final SettingsBoolChanged onShowMockMarkerChanged;
   final SettingsDarkModeChanged onDarkModeChanged;
   final SettingsAsyncVoidCallback onDisableMockLocation;
+  final SettingsAsyncVoidCallback onOpenPrivacyPolicy;
   final VoidCallback onRunSetupChecks;
   final WidgetBuilder debugPanelBuilder;
 
@@ -225,6 +229,23 @@ class _SpooferSettingsSideSheetState extends State<_SpooferSettingsSideSheet> {
                   },
                   icon: const Icon(Icons.check_circle_outline),
                   label: const Text('Run setup checks'),
+                ),
+                const SizedBox(height: 6),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: _compactDensity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    textStyle: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await widget.onOpenPrivacyPolicy();
+                  },
+                  icon: const Icon(Icons.privacy_tip_outlined),
+                  label: const Text('Privacy policy'),
                 ),
                 if (_showDebugPanel) ...[
                   const Divider(height: 16),

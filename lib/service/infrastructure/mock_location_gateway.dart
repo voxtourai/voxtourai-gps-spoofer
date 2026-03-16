@@ -70,6 +70,10 @@ class MockLocationGateway {
     await _channel.invokeMethod('openDeveloperSettings');
   }
 
+  Future<void> openExternalUrl(String url) async {
+    await _channel.invokeMethod('openExternalUrl', {'url': url});
+  }
+
   Future<List<Map<String, Object?>>> geocodeAddress(
     String query, {
     int maxResults = 8,

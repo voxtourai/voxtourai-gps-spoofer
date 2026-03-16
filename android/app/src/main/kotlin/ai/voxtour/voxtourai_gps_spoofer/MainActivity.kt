@@ -5,6 +5,7 @@ import android.location.LocationManager
 import android.location.LocationProvider
 import android.location.Criteria
 import android.location.Geocoder
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
@@ -138,6 +139,22 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     } catch (error: Exception) {
                         result.error("SETTINGS_ERROR", error.message, null)
+                    }
+                }
+                "openExternalUrl" -> {
+                    val url = call.argument<String>("url")
+                    if (url.isNullOrBlank()) {
+                        result.error("ARGUMENT_ERROR", "Missing url", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (error: Exception) {
+                        result.error("URL_ERROR", error.message, null)
                     }
                 }
                 "geocodeAddress" -> {

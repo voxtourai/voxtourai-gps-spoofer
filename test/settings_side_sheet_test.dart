@@ -76,6 +76,25 @@ void main() {
       expect(harness.runSetupChecksCalls, 1);
       expect(find.text('Settings'), findsNothing);
     });
+
+    testWidgets('privacy policy button invokes callback and closes sheet', (
+      tester,
+    ) async {
+      final harness = _SettingsSheetCallbacks();
+      await _pumpHost(
+        tester,
+        callbacks: harness,
+        initialSettings: const SpooferSettingsState(),
+      );
+
+      await _openSettingsSheet(tester);
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Privacy policy'));
+      await tester.pumpAndSettle();
+
+      expect(harness.openPrivacyPolicyCalls, 1);
+      expect(find.text('Settings'), findsNothing);
+    });
   });
 }
 
@@ -85,6 +104,7 @@ class _SettingsSheetCallbacks {
   final List<bool> showMockMarkerValues = <bool>[];
   final List<DarkModeSetting> darkModeValues = <DarkModeSetting>[];
   int disableMockLocationCalls = 0;
+  int openPrivacyPolicyCalls = 0;
   int runSetupChecksCalls = 0;
 }
 
@@ -110,6 +130,9 @@ Future<void> _pumpHost(
                     onDarkModeChanged: callbacks.darkModeValues.add,
                     onDisableMockLocation: () async {
                       callbacks.disableMockLocationCalls += 1;
+                    },
+                    onOpenPrivacyPolicy: () async {
+                      callbacks.openPrivacyPolicyCalls += 1;
                     },
                     onRunSetupChecks: () {
                       callbacks.runSetupChecksCalls += 1;

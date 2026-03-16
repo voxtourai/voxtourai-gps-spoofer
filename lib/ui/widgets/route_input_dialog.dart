@@ -129,22 +129,22 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const actionGap = 8.0;
+    const actionGap = 6.0;
     final utilityButtonStyle = TextButton.styleFrom(
       visualDensity: VisualDensity.compact,
       minimumSize: const Size(0, 38),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
     final outlinedUtilityButtonStyle = OutlinedButton.styleFrom(
       visualDensity: VisualDensity.compact,
       minimumSize: const Size(0, 38),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
     final primaryButtonStyle = FilledButton.styleFrom(
       visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       minimumSize: const Size(0, 38),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
@@ -222,13 +222,13 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
           Row(
             children: [
               SizedBox(
-                width: 28,
+                width: 24,
                 height: 36,
                 child: IconButton(
                   tooltip: 'Clear',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints.tightFor(
-                    width: 28,
+                    width: 24,
                     height: 36,
                   ),
                   splashRadius: 16,
@@ -241,8 +241,11 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
                 child: TextButton.icon(
                   style: utilityButtonStyle,
                   onPressed: _fillDemo,
-                  icon: const Icon(Icons.bolt_outlined, size: 16),
-                  label: const Text('Demo'),
+                  icon: const Icon(Icons.bolt_outlined, size: 14),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Demo', softWrap: false),
+                  ),
                 ),
               ),
               if (widget.pickFile != null) const SizedBox(width: actionGap),
@@ -256,8 +259,14 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
                             dimension: 14,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.upload_file_outlined, size: 16),
-                    label: Text(_pickingFile ? 'Loading...' : 'File'),
+                        : const Icon(Icons.upload_file_outlined, size: 14),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _pickingFile ? 'Loading...' : 'File',
+                        softWrap: false,
+                      ),
+                    ),
                   ),
                 ),
               const SizedBox(width: actionGap),
@@ -265,7 +274,10 @@ class _RouteInputDialogState extends State<RouteInputDialog> {
                 child: FilledButton(
                   style: primaryButtonStyle,
                   onPressed: _submit,
-                  child: const Text('Load'),
+                  child: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Load', softWrap: false),
+                  ),
                 ),
               ),
             ],

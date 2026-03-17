@@ -84,6 +84,7 @@ Future<String?> showRenameWaypointDialog({
 Future<void> showTermsOfUseDialog({
   required BuildContext context,
   required Future<void> Function() onAgree,
+  required Future<void> Function() onOpenPrivacyPolicy,
 }) async {
   await showDialog<void>(
     context: context,
@@ -92,9 +93,38 @@ Future<void> showTermsOfUseDialog({
       canPop: false,
       child: AlertDialog(
         title: const Text('Terms of Use'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'This tool is for testing and development only. You are responsible for using it legally and with permission. Location accuracy is not guaranteed, and you assume all risks from use.',
+        content: SingleChildScrollView(
+          child: DefaultTextStyle.merge(
+            style: Theme.of(context).textTheme.bodyMedium,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This tool is intended for testing and development use only.',
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'You are responsible for using it lawfully, with permission, and in compliance with any applicable policies or restrictions.',
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Mocked or simulated location results may be inaccurate, interrupted, or unavailable, and you assume the risks of relying on them.',
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'By continuing, you acknowledge and accept the Privacy Policy.',
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: onOpenPrivacyPolicy,
+                    child: const Text('View Privacy Policy'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

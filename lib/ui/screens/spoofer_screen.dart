@@ -1579,6 +1579,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     await showTermsOfUseDialog(
       context: context,
       onAgree: () => widget.preferencesStore.setTosAccepted(true),
+      onOpenPrivacyPolicy: _openPrivacyPolicy,
     );
 
     _tosAccepted = await widget.preferencesStore.isTosAccepted();

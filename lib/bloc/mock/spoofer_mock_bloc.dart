@@ -171,8 +171,10 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
     try {
       final selected = await _mockGateway.getMockLocationApp();
       final isSelected = await _safeBool(_mockGateway.isMockLocationApp);
+      final debug = await _mockGateway.getMockDebug();
       emit(
         state.copyWith(
+          lastMockStatus: debug ?? state.lastMockStatus,
           selectedMockApp: selected ?? state.selectedMockApp,
           isMockLocationApp: isSelected,
         ),
@@ -183,6 +185,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
               'Mock app: ${selected ?? '—'} selected=${isSelected ? 'YES' : 'NO'}',
         ),
       );
+      _appendStatusDebug(debug, prefix: 'Refresh');
     } catch (_) {
       // Ignore refresh failures.
     }
@@ -201,6 +204,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
         speedMps: event.speedMps,
       );
       emit(state.copyWith(lastMockStatus: result ?? state.lastMockStatus));
+      _appendStatusDebug(result, prefix: 'Apply');
 
       final gpsApplied = result?['gpsApplied'] == true;
       final mockAppSelected = result?['mockAppSelected'] == true;
@@ -253,6 +257,7 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
           mockError: null,
         ),
       );
+      _appendStatusDebug(result, prefix: 'Clear');
       add(const SpooferMockDebugLogAppended(message: 'Cleared mock location.'));
     } on PlatformException catch (error) {
       add(
@@ -373,6 +378,82 @@ class SpooferMockBloc extends Bloc<SpooferMockEvent, SpooferMockState> {
       next.removeRange(0, next.length - 50);
     }
     emit(state.copyWith(debugLog: List<String>.unmodifiable(next)));
+  }
+
+  void _appendStatusDebug(
+    Map<String, Object?>? status, {
+    required String prefix,
+  }) {
+    if (status == null) {
+      return;
+    }
+
+    final sequence = status['sequence'];
+    final gpsApplied = status['gpsApplied'];
+    final fusedApplied = status['fusedApplied'];
+    final sinceLast = status['sinceLastMockMs'];
+    final requested = _formatLocation(status['requestedLocation']);
+    final readback = _formatLocation(status['bestReadbackAfter']);
+
+    add(
+      SpooferMockDebugLogAppended(
+        message:
+            '$prefix seq=${sequence ?? '—'} gps=${_formatValue(gpsApplied)} fused=${_formatValue(fusedApplied)} delta=${_formatDuration(sinceLast)} req=${requested ?? '—'}',
+      ),
+    );
+
+    if (readback != null) {
+      add(SpooferMockDebugLogAppended(message: '$prefix readback=${readback}'));
+    }
+
+    final gpsError = status['gpsError'];
+    if (gpsError != null) {
+      add(SpooferMockDebugLogAppended(message: '$prefix GPS error: $gpsError'));
+    }
+
+    final fusedError = status['fusedError'];
+    if (fusedError != null) {
+      add(
+        SpooferMockDebugLogAppended(
+          message: '$prefix fused error: $fusedError',
+        ),
+      );
+    }
+  }
+
+  String _formatDuration(Object? value) {
+    if (value is num) {
+      return '${value.toInt()}ms';
+    }
+    return '—';
+  }
+
+  String _formatValue(Object? value) {
+    if (value == null) {
+      return '—';
+    }
+    if (value is bool) {
+      return value ? 'YES' : 'NO';
+    }
+    return value.toString();
+  }
+
+  String? _formatLocation(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    final map = value.map((key, entry) => MapEntry(key.toString(), entry));
+    final lat = map['latitude'];
+    final lng = map['longitude'];
+    if (lat is! num || lng is! num) {
+      return null;
+    }
+    final provider = map['provider'];
+    final accuracy = map['accuracy'];
+    final providerText = provider == null ? '' : ' ${provider.toString()}';
+    final accuracyText = accuracy == null ? '' : ' acc=${accuracy.toString()}';
+    return '${lat.toDouble().toStringAsFixed(6)}, ${lng.toDouble().toStringAsFixed(6)}$providerText$accuracyText'
+        .trim();
   }
 
   void _onMessageRequested(

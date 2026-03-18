@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/scheduler.dart' as scheduler;
 import 'package:flutter_background/flutter_background.dart';
@@ -52,6 +55,8 @@ import 'search_screen.dart';
 
 const String _samplePolyline =
     'kenpGym~}@IsJo@Cm@Qm@_@e@i@Wa@EMYV?BWyC?EzFmA@?^u@nAcEpA_FD?CAAKDSF?^gBD@DU@?@I@?D[NHB@`@cB@?y@m@m@e@AQCC@??Pj@b@DDd@uBDAHFFEDF?DTRJFz@gD@?QIJoB@?yBe@vBd@@?HcB@?zBXFAB@@c@?e@RuCD??[@?VD@@YGDq@?IB?HK@?AOPqA@?b@gC@?Xo@@?X}@@?z@uC@?nFfBlARBBVgC^iCB?o@hEa@pE?DgAdK_A|G?BgA_@MxA?BA?';
+const String _privacyPolicyUrl =
+    'https://support.voxtour.ai/voxtourai-gps-spoofer/privacy-policy/';
 
 class SpooferScreen extends StatefulWidget {
   SpooferScreen({
@@ -162,7 +167,8 @@ class _SpooferScreenState extends State<SpooferScreen>
     final playbackBloc = context.read<SpooferPlaybackBloc>();
     if (state == AppLifecycleState.resumed) {
       playbackBloc.add(const SpooferPlaybackAppResumed());
-    } else {
+    } else if (state == AppLifecycleState.detached ||
+        !_settingsState.backgroundEnabled) {
       playbackBloc.add(const SpooferPlaybackAppPaused());
     }
     if (widget.launchOptions.manageBackgroundNotifications) {
@@ -546,8 +552,13 @@ class _SpooferScreenState extends State<SpooferScreen>
                           onTogglePlayback: hasRoute ? _togglePlayback : null,
                           onOpenWaypoints: _openWaypointList,
                           onFitRoute: () {
-                            _fitRouteToMap();
-                            _showUiOverlay('Map fit to route');
+                            final wasAutoFollow = mapState.autoFollowEnabled;
+                            _fitRouteToMap(disableAutoFollow: true);
+                            _showUiOverlay(
+                              wasAutoFollow
+                                  ? 'Map fit to route · auto-follow off'
+                                  : 'Map fit to route',
+                            );
                           },
                           onRecenter: () {
                             final currentPosition = mapState.currentPosition;
@@ -682,6 +693,13 @@ class _SpooferScreenState extends State<SpooferScreen>
         sampleRoute: _samplePolyline,
         detectPolyline: extractPolylineFromInput,
         onDemoFilled: () => _showUiOverlay('Filled demo route.'),
+        onFileLoaded: (fileName) {
+          final label = fileName == null || fileName.isEmpty
+              ? 'Loaded route file.'
+              : 'Loaded file: $fileName';
+          _showUiOverlay(label);
+        },
+        pickFile: _pickRouteFile,
       ),
     );
     if (input == null) {
@@ -695,6 +713,39 @@ class _SpooferScreenState extends State<SpooferScreen>
     context.read<SpooferMockBloc>().add(
       const SpooferMockClearLocationRequested(),
     );
+  }
+
+  Future<RouteInputPickedFile?> _pickRouteFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        return null;
+      }
+
+      final file = result.files.single;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _showUiSnack('Unable to read file contents.');
+        return null;
+      }
+
+      final text = utf8.decode(bytes, allowMalformed: true).trim();
+      if (text.isEmpty) {
+        _showUiSnack('Selected file is empty.');
+        return null;
+      }
+
+      return RouteInputPickedFile(text: text, name: file.name);
+    } on PlatformException catch (error) {
+      _showUiSnack('Failed to load file: ${error.message ?? error.code}');
+      return null;
+    } catch (error) {
+      _showUiSnack('Failed to load file: $error');
+      return null;
+    }
   }
 
   Future<LatLng?> _getRealLocation() async {
@@ -875,14 +926,73 @@ class _SpooferScreenState extends State<SpooferScreen>
     );
   }
 
-  Widget _buildDebugPanel(BuildContext context, SpooferMockState mockState) {
-    return SpooferDebugPanel(
-      lastInjectedPosition: _mapState.lastInjectedPosition,
-      status: mockState.lastMockStatus,
-      isMockLocationApp: mockState.isMockLocationApp,
-      selectedMockApp: mockState.selectedMockApp,
-      debugLog: mockState.debugLog,
-      onRefreshMockStatus: _refreshMockAppStatus,
+  Future<void> _openDebugPanel() async {
+    if (!mounted) {
+      return;
+    }
+    final media = MediaQuery.sizeOf(context);
+    final dialogWidth = media.width > 560 ? 560.0 : media.width - 24;
+    final dialogHeight = media.height > 760 ? 760.0 : media.height - 48;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 24,
+          ),
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Debug panel',
+                        style: Theme.of(dialogContext).textTheme.titleMedium,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        tooltip: 'Close',
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: BlocBuilder<SpooferMapBloc, SpooferMapState>(
+                      builder: (context, mapState) {
+                        return BlocBuilder<SpooferMockBloc, SpooferMockState>(
+                          builder: (context, mockState) {
+                            return SpooferDebugPanel(
+                              lastInjectedPosition:
+                                  mapState.lastInjectedPosition,
+                              status: mockState.lastMockStatus,
+                              isMockLocationApp: mockState.isMockLocationApp,
+                              selectedMockApp: mockState.selectedMockApp,
+                              debugLog: mockState.debugLog,
+                              onRefreshMockStatus: _refreshMockAppStatus,
+                              expanded: true,
+                              showTitle: false,
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -934,6 +1044,9 @@ class _SpooferScreenState extends State<SpooferScreen>
           androidConfig: _backgroundConfig,
         );
         if (!initialized) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           if (showFeedback) {
             _showUiSnack(
               'Please disable battery optimizations to enable background mode.',
@@ -943,6 +1056,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         }
         final hasPermissions = await FlutterBackground.hasPermissions;
         if (!hasPermissions) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           if (showFeedback) {
             _showUiSnack(
               'Background permissions not granted. Disable battery optimizations and retry.',
@@ -952,6 +1068,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         }
         final success = await FlutterBackground.enableBackgroundExecution();
         if (!success) {
+          _settingsBloc.add(
+            const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+          );
           if (showFeedback) {
             _showUiSnack('Failed to enable background mode.');
           }
@@ -976,6 +1095,9 @@ class _SpooferScreenState extends State<SpooferScreen>
         return true;
       }
     } catch (error) {
+      _settingsBloc.add(
+        const SpooferSettingsBackgroundEnabledSetRequested(value: false),
+      );
       if (showFeedback) {
         _showUiSnack('Background mode error: $error');
       }
@@ -1289,7 +1411,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     _mapController!.moveCamera(CameraUpdate.newLatLng(position));
   }
 
-  void _fitRouteToMap() {
+  void _fitRouteToMap({bool disableAutoFollow = false}) {
     final routeState = context.read<SpooferRouteBloc>().state;
     if (_mapController == null) {
       _setMapPendingFitRoute(true);
@@ -1298,7 +1420,11 @@ class _SpooferScreenState extends State<SpooferScreen>
     if (!routeState.hasPoints) {
       return;
     }
+    if (disableAutoFollow && _mapState.autoFollowEnabled) {
+      _setMapAutoFollow(false);
+    }
     _setMapPendingFitRoute(false);
+    _setMapProgrammaticMove(true);
 
     if (routeState.routePoints.length == 1) {
       _mapController!.moveCamera(
@@ -1453,6 +1579,7 @@ class _SpooferScreenState extends State<SpooferScreen>
     await showTermsOfUseDialog(
       context: context,
       onAgree: () => widget.preferencesStore.setTosAccepted(true),
+      onOpenPrivacyPolicy: _openPrivacyPolicy,
     );
 
     _tosAccepted = await widget.preferencesStore.isTosAccepted();
@@ -1502,11 +1629,6 @@ class _SpooferScreenState extends State<SpooferScreen>
           SpooferSettingsShowSetupBarSetRequested(value: value),
         );
       },
-      onShowDebugPanelChanged: (value) {
-        _settingsBloc.add(
-          SpooferSettingsShowDebugPanelSetRequested(value: value),
-        );
-      },
       onShowMockMarkerChanged: (value) {
         _settingsBloc.add(
           SpooferSettingsShowMockMarkerSetRequested(value: value),
@@ -1515,14 +1637,27 @@ class _SpooferScreenState extends State<SpooferScreen>
       },
       onDarkModeChanged: _applyDarkModeSetting,
       onDisableMockLocation: _disableMockLocationAndRecenter,
+      onOpenDeveloperOptions: _openDeveloperOptions,
+      onOpenPrivacyPolicy: _openPrivacyPolicy,
+      onOpenDebugPanel: _openDebugPanel,
       onRunSetupChecks: () => _requestStartupChecks(showDialogs: true),
-      debugPanelBuilder: (context) {
-        return _buildDebugPanel(
-          context,
-          context.watch<SpooferMockBloc>().state,
-        );
-      },
     );
+  }
+
+  Future<void> _openDeveloperOptions() async {
+    try {
+      await widget.mockGateway.openDeveloperSettings();
+    } on PlatformException {
+      _showUiSnack('Failed to open developer options.');
+    }
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    try {
+      await widget.mockGateway.openExternalUrl(_privacyPolicyUrl);
+    } on PlatformException {
+      _showUiSnack('Failed to open privacy policy.');
+    }
   }
 
   Future<void> _openHelpScreen() async {

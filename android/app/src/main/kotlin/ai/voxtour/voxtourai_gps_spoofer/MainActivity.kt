@@ -5,6 +5,7 @@ import android.location.LocationManager
 import android.location.LocationProvider
 import android.location.Criteria
 import android.location.Geocoder
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
@@ -25,6 +26,8 @@ class MainActivity : FlutterActivity() {
     private var fusedClient: FusedLocationProviderClient? = null
     private var fusedMockEnabled = false
     private var lastMockDebug: Map<String, Any?> = emptyMap()
+    private var lastMockAppliedAtMs: Long? = null
+    private var mockSequence = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -140,6 +143,22 @@ class MainActivity : FlutterActivity() {
                         result.error("SETTINGS_ERROR", error.message, null)
                     }
                 }
+                "openExternalUrl" -> {
+                    val url = call.argument<String>("url")
+                    if (url.isNullOrBlank()) {
+                        result.error("ARGUMENT_ERROR", "Missing url", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    } catch (error: Exception) {
+                        result.error("URL_ERROR", error.message, null)
+                    }
+                }
                 "geocodeAddress" -> {
                     val query = call.argument<String>("query") ?: ""
                     val maxResults = call.argument<Int>("maxResults") ?: 8
@@ -252,6 +271,9 @@ class MainActivity : FlutterActivity() {
     ): Map<String, Any?> {
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         val providers = listOf(LocationManager.GPS_PROVIDER)
+        val requestedAtMs = System.currentTimeMillis()
+        val sinceLastMockMs = lastMockAppliedAtMs?.let { requestedAtMs - it }
+        mockSequence += 1
 
         var gpsApplied = false
         var fusedApplied = false
@@ -271,7 +293,7 @@ class MainActivity : FlutterActivity() {
             this.longitude = longitude
             this.accuracy = accuracy.toFloat()
             this.speed = speedMps.toFloat()
-            time = System.currentTimeMillis()
+            time = requestedAtMs
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                 elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
             }
@@ -313,7 +335,7 @@ class MainActivity : FlutterActivity() {
                 this.longitude = longitude
                 this.accuracy = accuracy.toFloat()
                 this.speed = speedMps.toFloat()
-                time = System.currentTimeMillis()
+                time = requestedAtMs
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
                     elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
                 }
@@ -361,9 +383,25 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        val gpsReadbackAfter = locationToMap(
+            safeGetLastKnownLocation(locationManager, LocationManager.GPS_PROVIDER)
+        )
+        val bestReadbackAfter = locationToMap(getBestLastKnownLocation(locationManager))
+        val selectedMockApp = try {
+            Settings.Secure.getString(contentResolver, "mock_location_app")
+        } catch (_: Exception) {
+            null
+        }
+        lastMockAppliedAtMs = requestedAtMs
+
         val status = mapOf(
+            "sequence" to mockSequence,
+            "requestedAtMs" to requestedAtMs,
+            "sinceLastMockMs" to sinceLastMockMs,
+            "requestedLocation" to locationToMap(baseLocation),
             "gpsApplied" to gpsApplied,
             "fusedApplied" to fusedApplied,
+            "fusedMockEnabled" to fusedMockEnabled,
             "gpsError" to gpsError,
             "fusedError" to fusedError,
             "addProviderError" to addProviderError,
@@ -374,7 +412,12 @@ class MainActivity : FlutterActivity() {
             "enableProviderResult" to enableProviderResult,
             "statusProviderResult" to statusProviderResult,
             "removeProviderResult" to removeProviderResult,
-            "mockAppSelected" to isMockLocationApp()
+            "enabledProviders" to locationManager.getProviders(true),
+            "testProvidersReady" to testProvidersReady.toList(),
+            "gpsReadbackAfter" to gpsReadbackAfter,
+            "bestReadbackAfter" to bestReadbackAfter,
+            "mockAppSelected" to isMockLocationApp(),
+            "selectedMockApp" to selectedMockApp
         )
         lastMockDebug = status
         return status
@@ -382,6 +425,7 @@ class MainActivity : FlutterActivity() {
     private fun clearMockLocation(): Map<String, Any?> {
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         val providers = listOf(LocationManager.GPS_PROVIDER)
+        val clearedAtMs = System.currentTimeMillis()
 
         var gpsCleared = false
         var fusedCleared = false
@@ -410,27 +454,44 @@ class MainActivity : FlutterActivity() {
         }
 
         testProvidersReady.clear()
+        lastMockAppliedAtMs = null
 
         val status = mapOf(
+            "requestedAtMs" to clearedAtMs,
+            "sequence" to mockSequence,
             "gpsCleared" to gpsCleared,
             "fusedCleared" to fusedCleared,
             "gpsError" to gpsError,
             "fusedError" to fusedError,
-            "mockAppSelected" to isMockLocationApp()
+            "mockAppSelected" to isMockLocationApp(),
+            "selectedMockApp" to try {
+                Settings.Secure.getString(contentResolver, "mock_location_app")
+            } catch (_: Exception) {
+                null
+            }
         )
         lastMockDebug = status
         return status
+    }
+
+    private fun safeGetLastKnownLocation(
+        locationManager: LocationManager,
+        provider: String
+    ): Location? {
+        return try {
+            locationManager.getLastKnownLocation(provider)
+        } catch (_: SecurityException) {
+            null
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun getBestLastKnownLocation(locationManager: LocationManager): Location? {
         var best: Location? = null
         val providers = locationManager.getProviders(true)
         for (provider in providers) {
-            val location = try {
-                locationManager.getLastKnownLocation(provider)
-            } catch (_: SecurityException) {
-                null
-            }
+            val location = safeGetLastKnownLocation(locationManager, provider)
             if (location != null) {
                 if (best == null || location.time > best!!.time) {
                     best = location
@@ -438,6 +499,20 @@ class MainActivity : FlutterActivity() {
             }
         }
         return best
+    }
+
+    private fun locationToMap(location: Location?): Map<String, Any?>? {
+        if (location == null) {
+            return null
+        }
+        return mapOf(
+            "provider" to location.provider,
+            "latitude" to location.latitude,
+            "longitude" to location.longitude,
+            "accuracy" to location.accuracy,
+            "speed" to location.speed,
+            "time" to location.time
+        )
     }
 
 
